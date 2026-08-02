@@ -1,3 +1,5 @@
+import { accessSync, constants, existsSync } from "node:fs"
+import { createRequire } from "node:module"
 import { spawn } from "node-pty"
 // @xterm/headless is CommonJS and exposes Terminal only through the default
 // export, so a named import type-checks against its .d.ts and then fails at
@@ -6,6 +8,51 @@ import headless from "@xterm/headless"
 import { SerializeAddon } from "@xterm/addon-serialize"
 
 const { Terminal } = headless
+
+// node-pty spawns a small helper binary, and "posix_spawnp failed" is all it
+// says when that helper is not executable. Its prebuilds ship without the mode
+// bit and the postinstall that sets it is the first thing an npm allow-scripts
+// policy blocks — so the common cause is a permission, not a bad command, and
+// the raw error points at neither.
+const explainSpawnFailure = (error: unknown, command: string): Error => {
+  const message = error instanceof Error ? error.message : String(error)
+  if (!message.includes("posix_spawnp")) {
+    return error instanceof Error ? error : new Error(message)
+  }
+
+  const helper = helperPath()
+  const notExecutable = helper !== undefined && !isExecutable(helper)
+
+  return new Error(
+    `Could not open a pty for ${command}: ${message}\n` +
+      (notExecutable
+        ? `  node-pty's helper is not executable. Fix with:\n` +
+          `    chmod +x ${helper}\n` +
+          `  It ships without the mode bit when install scripts are blocked;\n` +
+          `  npm approve-scripts node-pty makes it survive a reinstall.`
+        : `  Check that the command exists and is executable.`),
+    { cause: error },
+  )
+}
+
+const helperPath = (): string | undefined => {
+  const candidate = createRequire(import.meta.url)
+    .resolve("node-pty")
+    .replace(
+      /node-pty\/.*$/,
+      `node-pty/prebuilds/${process.platform}-${process.arch}/spawn-helper`,
+    )
+  return existsSync(candidate) ? candidate : undefined
+}
+
+const isExecutable = (path: string): boolean => {
+  try {
+    accessSync(path, constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
 
 export type CaptureOptions = {
   cols?: number
@@ -53,7 +100,7 @@ export const capture = (
         env: { ...process.env, ...env } as Record<string, string>,
       })
     } catch (error) {
-      reject(error)
+      reject(explainSpawnFailure(error, command))
       return
     }
 
