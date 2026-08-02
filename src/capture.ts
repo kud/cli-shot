@@ -77,9 +77,9 @@ export const capture = (
   command: string,
   args: readonly string[] = [],
   {
-    cols = 120,
-    rows = 36,
-    settle = 700,
+    cols = 110,
+    rows = 32,
+    settle = 800,
     timeout = 15_000,
     env,
     keys,
