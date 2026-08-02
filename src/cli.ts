@@ -20,7 +20,7 @@ program
       "  cli-shot --out assets/screenshots -- pcloud",
   )
   .requiredOption("-o, --out <dir>", "directory to write PNGs into")
-  .option("-s, --screen <name>", "shoot one screen instead of every screen")
+  .option("--only <screen>", "shoot one screen instead of every screen")
   .option("--list", "print the screens the command offers, and stop")
   .option("--cols <n>", "terminal columns", "110")
   .option("--rows <n>", "terminal rows", "32")
@@ -64,8 +64,16 @@ if (options.list) {
   process.exit(0)
 }
 
-const written = options.screen
-  ? [await shootScreen(options.screen, shoot)]
-  : await shootAll(shoot)
+// A misused flag or a missing binary is a user error, and a Node stack trace
+// buries the one line that says which. The messages thrown from here are
+// written to be read, so print them and nothing else.
+try {
+  const written = options.only
+    ? [await shootScreen(options.only, shoot)]
+    : await shootAll(shoot)
 
-for (const path of written) console.log(path)
+  for (const path of written) console.log(path)
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error))
+  process.exit(1)
+}
