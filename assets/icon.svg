@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="cli-shot">
+  <!-- Terminal frame: the shared shape across the cli-* tools. -->
+  <rect x="4.5" y="10.5" width="55" height="43" rx="6"
+        fill="none" stroke="#8B95A5" stroke-width="3"/>
+  <!-- Prompt caret, bottom-left, marking this as a terminal thing. -->
+  <path d="M13 44l6-5-6-5" fill="none" stroke="#8B95A5" stroke-width="3"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Lens rather than an aperture: blades converging on the centre read as a
+       peace sign once the mark is small, while a ring around a pupil stays a
+       camera down to a 16px favicon. Distinguished from cli-testing's tick by
+       silhouette, not by hue. -->
+  <circle cx="38" cy="32" r="12" fill="none" stroke="#2DD4BF" stroke-width="3"/>
+  <circle cx="38" cy="32" r="5" fill="#2DD4BF"/>
+</svg>
