@@ -58,6 +58,7 @@ cli-shot --out shots --no-mock -- pcloud          # real data (careful)
 | `--cols` / `--rows`   | terminal size (default 110×32)                        |
 | `--settle <ms>`       | silence that counts as finished drawing (default 800) |
 | `--keys <sequence>`   | keystrokes sent once the screen has drawn             |
+| `--font <family>`     | font to render with; defaults to a Nerd Font          |
 | `--no-mock`           | drive real data instead of fixtures                   |
 
 ## The contract

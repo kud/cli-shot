@@ -71,3 +71,23 @@ test("a missing freeze binary is reported, not swallowed", () => {
     process.env.PATH = path
   }
 })
+
+// The tofu bug this defends against renders every TUI icon as a box printing
+// its own codepoint, which reads as a fault in the app rather than a missing
+// font — so the font has to be passed, and has to be overridable.
+test("passes a Nerd Font to freeze by default", () => {
+  expect(() =>
+    toImage("x\n", join(staging, "font.png"), {
+      freezeArgs: ["--not-a-real-flag"],
+    }),
+  ).toThrow(/--font\.family JetBrainsMono Nerd Font Mono/)
+})
+
+test("an explicit font wins over the default", () => {
+  expect(() =>
+    toImage("x\n", join(staging, "font2.png"), {
+      font: "Hack Nerd Font Mono",
+      freezeArgs: ["--not-a-real-flag"],
+    }),
+  ).toThrow(/--font\.family Hack Nerd Font Mono/)
+})

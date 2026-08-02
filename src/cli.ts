@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander"
 import { listScreens } from "./screens.js"
-import { shootAll, shootScreen } from "./index.js"
+import { shootAll, shootScreen, DEFAULT_FONT } from "./index.js"
 
 // Everything after `--` is the CLI being driven, split off before commander
 // sees it. Without that split a driven flag like --mock is claimed by cli-shot,
@@ -26,6 +26,11 @@ program
   .option("--rows <n>", "terminal rows", "32")
   .option("--settle <ms>", "silence that counts as finished drawing", "800")
   .option("--keys <sequence>", "keystrokes to send once the screen has drawn")
+  .option(
+    "--font <family>",
+    "font to render with; needs Nerd Font coverage for TUI icons",
+    DEFAULT_FONT,
+  )
   .option("--no-mock", "drive real data instead of fixtures")
   .parse(own)
 
@@ -49,6 +54,7 @@ const shoot = {
   rows: Number(options.rows),
   settle: Number(options.settle),
   keys: options.keys,
+  font: options.font,
 }
 
 if (options.list) {

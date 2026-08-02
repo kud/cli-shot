@@ -104,14 +104,14 @@ export const capture = (
     }
 
     let raw = 0
-    let idle: NodeJS.Timeout | undefined
     let sentKeys = false
     let finished = false
+    let previous = ""
 
     const finish = () => {
       if (finished) return
       finished = true
-      clearTimeout(idle)
+      clearInterval(poll)
       clearTimeout(hard)
       try {
         pty.kill()
@@ -123,41 +123,44 @@ export const capture = (
       term.write("", () => resolve(serializer.serialize()))
     }
 
-    // Silence alone cannot tell "finished drawing" from "has not started yet".
-    // A CLI run through tsx emits a few bytes, then goes quiet for seconds while
-    // it compiles — long enough for any settle window to expire and serialise a
-    // blank terminal. Requiring something on screen first makes the condition
-    // semantic rather than temporal, so a startup pause keeps waiting.
-    const drawn = () => {
+    // What settles is the SCREEN, not the stream. An Ink TUI keeps emitting
+    // cursor moves and repaints long after it looks finished, so waiting for the
+    // stream to go quiet never fires — every capture ran to the hard timeout,
+    // which is where the seconds were going. Comparing the rendered grid instead
+    // ends the wait as soon as the picture stops changing, however much traffic
+    // is still flowing.
+    //
+    // Reading the grid also distinguishes "finished" from "has not started":
+    // an empty screen is never stable, so a slow startup keeps waiting.
+    const grid = () => {
       const buffer = term.buffer.active
+      const lines: string[] = []
       for (let y = 0; y < buffer.length; y++) {
-        if ((buffer.getLine(y)?.translateToString(true) ?? "").trim())
-          return true
+        lines.push(buffer.getLine(y)?.translateToString(true) ?? "")
       }
-      return false
+      return lines.join("\n")
     }
 
-    const onSettled = () => {
-      if (!drawn()) {
-        idle = setTimeout(onSettled, settle)
+    const poll = setInterval(() => {
+      const current = grid()
+      if (current.trim() && current === previous) {
+        if (keys && !sentKeys) {
+          sentKeys = true
+          pty.write(keys)
+          previous = ""
+          return
+        }
+        finish()
         return
       }
-      if (keys && !sentKeys) {
-        sentKeys = true
-        pty.write(keys)
-        idle = setTimeout(onSettled, settle)
-        return
-      }
-      finish()
-    }
+      previous = current
+    }, settle)
 
     const hard = setTimeout(finish, timeout)
 
     pty.onData((data) => {
       raw += data.length
       term.write(data)
-      clearTimeout(idle)
-      idle = setTimeout(onSettled, settle)
     })
 
     // node-pty does not always throw for a command that cannot be run — it
@@ -165,9 +168,9 @@ export const capture = (
     // as an empty capture would hand freeze nothing and blame the renderer, so
     // a non-zero exit that drew nothing rejects here where the cause is known.
     pty.onExit(({ exitCode }) => {
-      clearTimeout(idle)
       if (exitCode !== 0 && raw === 0) {
         finished = true
+        clearInterval(poll)
         clearTimeout(hard)
         reject(
           explainSpawnFailure(
@@ -177,6 +180,7 @@ export const capture = (
         )
         return
       }
-      idle = setTimeout(onSettled, 0)
+      // A command that exits on its own has drawn everything it is going to.
+      finish()
     })
   })

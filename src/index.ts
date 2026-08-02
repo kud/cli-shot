@@ -5,7 +5,7 @@ import { toImage, type RenderOptions } from "./render.js"
 
 export { capture, type CaptureOptions } from "./capture.js"
 export { listScreens } from "./screens.js"
-export { toImage, type RenderOptions } from "./render.js"
+export { toImage, DEFAULT_FONT, type RenderOptions } from "./render.js"
 
 export type ShootOptions = CaptureOptions &
   RenderOptions & {
