@@ -33,6 +33,7 @@
   "dependencies": {
     "@xterm/addon-serialize": "0.14.0",
     "@xterm/headless": "6.0.0",
+    "commander": "15.0.0",
     "node-pty": "1.1.0"
   },
   "devDependencies": {
@@ -40,5 +41,11 @@
     "tsup": "8.5.1",
     "typescript": "5.9.3",
     "vitest": "4.1.10"
+  },
+  "allowScripts": {
+    "node-pty@1.1.0": true
+  },
+  "bin": {
+    "cli-shot": "dist/cli.js"
   }
 }

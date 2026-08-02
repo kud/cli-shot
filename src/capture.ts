@@ -76,7 +76,25 @@ export const capture = (
       term.write("", () => resolve(serializer.serialize()))
     }
 
+    // Silence alone cannot tell "finished drawing" from "has not started yet".
+    // A CLI run through tsx emits a few bytes, then goes quiet for seconds while
+    // it compiles — long enough for any settle window to expire and serialise a
+    // blank terminal. Requiring something on screen first makes the condition
+    // semantic rather than temporal, so a startup pause keeps waiting.
+    const drawn = () => {
+      const buffer = term.buffer.active
+      for (let y = 0; y < buffer.length; y++) {
+        if ((buffer.getLine(y)?.translateToString(true) ?? "").trim())
+          return true
+      }
+      return false
+    }
+
     const onSettled = () => {
+      if (!drawn()) {
+        idle = setTimeout(onSettled, settle)
+        return
+      }
       if (keys && !sentKeys) {
         sentKeys = true
         pty.write(keys)
