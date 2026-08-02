@@ -9,6 +9,10 @@ import { SerializeAddon } from "@xterm/addon-serialize"
 
 const { Terminal } = headless
 
+// How often the screen is sampled. Independent of `settle`, which is how long
+// it must hold still to count as finished.
+const TICK_MS = 60
+
 // node-pty spawns a small helper binary, and "posix_spawnp failed" is all it
 // says when that helper is not executable. Its prebuilds ship without the mode
 // bit and the postinstall that sets it is the first thing an npm allow-scripts
@@ -56,7 +60,7 @@ const isExecutable = (path: string): boolean => {
 export type CaptureOptions = {
   cols?: number
   rows?: number
-  /** Milliseconds of silence that count as "finished drawing". */
+  /** How long the rendered screen must hold still to count as finished. */
   settle?: number
   /** Hard limit before the child is killed regardless. */
   timeout?: number
@@ -79,7 +83,7 @@ export const capture = (
   {
     cols = 110,
     rows = 32,
-    settle = 800,
+    settle = 350,
     timeout = 15_000,
     env,
     keys,
@@ -141,20 +145,33 @@ export const capture = (
       return lines.join("\n")
     }
 
+    // Sampled far more often than the stability window it is proving. Polling
+    // once per `settle` would make the minimum wait two full windows — one
+    // sample to record, one to compare — so a 800ms window cost 1.6s even on a
+    // screen that was final immediately. Ticking finely decouples "how long the
+    // screen must hold still" from "how soon we notice that it has".
+    let stableFor = 0
     const poll = setInterval(() => {
       const current = grid()
-      if (current.trim() && current === previous) {
-        if (keys && !sentKeys) {
-          sentKeys = true
-          pty.write(keys)
-          previous = ""
-          return
-        }
-        finish()
+
+      if (current !== previous || !current.trim()) {
+        previous = current
+        stableFor = 0
         return
       }
-      previous = current
-    }, settle)
+
+      stableFor += TICK_MS
+      if (stableFor < settle) return
+
+      if (keys && !sentKeys) {
+        sentKeys = true
+        pty.write(keys)
+        previous = ""
+        stableFor = 0
+        return
+      }
+      finish()
+    }, TICK_MS)
 
     const hard = setTimeout(finish, timeout)
 

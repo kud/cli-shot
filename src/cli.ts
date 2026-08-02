@@ -24,13 +24,14 @@ program
   .option("--list", "print the screens the command offers, and stop")
   .option("--cols <n>", "terminal columns", "110")
   .option("--rows <n>", "terminal rows", "32")
-  .option("--settle <ms>", "silence that counts as finished drawing", "800")
+  .option("--settle <ms>", "how long the screen must hold still", "350")
   .option("--keys <sequence>", "keystrokes to send once the screen has drawn")
   .option(
     "--font <family>",
     "font to render with; needs Nerd Font coverage for TUI icons",
     DEFAULT_FONT,
   )
+  .option("--jobs <n>", "screens to shoot at once; defaults to core count")
   .option("--no-mock", "drive real data instead of fixtures")
   .parse(own)
 
@@ -55,6 +56,7 @@ const shoot = {
   settle: Number(options.settle),
   keys: options.keys,
   font: options.font,
+  concurrency: options.jobs ? Number(options.jobs) : undefined,
 }
 
 if (options.list) {
