@@ -13,6 +13,11 @@ const { Terminal } = headless
 // it must hold still to count as finished.
 const TICK_MS = 60
 
+// node-pty's own messages, not an application's — matched narrowly so a CLI that
+// legitimately prints "No such file or directory" is not mistaken for one that
+// never ran.
+const HELPER_FAILURE = /execvp\(\d\) failed|posix_spawnp failed/
+
 // node-pty spawns a small helper binary, and "posix_spawnp failed" is all it
 // says when that helper is not executable. Its prebuilds ship without the mode
 // bit and the postinstall that sets it is the first thing an npm allow-scripts
@@ -185,13 +190,19 @@ export const capture = (
     // as an empty capture would hand freeze nothing and blame the renderer, so
     // a non-zero exit that drew nothing rejects here where the cause is known.
     pty.onExit(({ exitCode }) => {
-      if (exitCode !== 0 && raw === 0) {
+      // Platforms disagree about where the failure goes. macOS fails before the
+      // child writes anything, so nothing is drawn. Linux writes the helper's
+      // own "execvp(3) failed" into the pty and then exits — which counts as
+      // having drawn, so a check on emptiness alone let it through and resolved
+      // with that message as the screen. Left there, cli-shot would render a
+      // PNG of the error rather than reporting one.
+      if (exitCode !== 0 && (raw === 0 || HELPER_FAILURE.test(grid()))) {
         finished = true
         clearInterval(poll)
         clearTimeout(hard)
         reject(
           explainSpawnFailure(
-            new Error(`exited ${exitCode} without drawing anything`),
+            new Error(`the command exited ${exitCode} without drawing a screen`),
             command,
           ),
         )
