@@ -32,25 +32,3 @@ test("a command that fails surfaces rather than reading as no screens", () => {
   expect(() => listScreens(sh, ["-c", "exit 2"])).toThrow()
 })
 
-// Passing a flag cli-shot appends leaves two in argv: the app reads the first
-// and the filename comes from the second, which produced a files.png holding
-// the Sync screen — exit 0, no warning. Refusing beats picking a winner.
-test("refuses a driven command that carries a flag cli-shot manages", async () => {
-  const { shootScreen } = await import("./index.js")
-
-  await expect(
-    shootScreen("files", {
-      command: sh,
-      args: ["-c", "true", "--screen", "sync"],
-      out: "/tmp/never",
-    }),
-  ).rejects.toThrow(/--screen is set by cli-shot[\s\S]*--only/)
-
-  await expect(
-    shootScreen("files", {
-      command: sh,
-      args: ["-c", "true", "--mock"],
-      out: "/tmp/never",
-    }),
-  ).rejects.toThrow(/--mock is set by cli-shot[\s\S]*--no-mock/)
-})

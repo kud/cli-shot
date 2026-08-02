@@ -26,36 +26,29 @@ export type ShootOptions = CaptureOptions &
     concurrency?: number
   }
 
-// cli-shot appends these itself, so a command that already carries one leaves
-// two in argv — and the app reads the first while the filename comes from the
-// second. That produced a files.png containing the Sync screen, exit 0, no
-// warning. Refusing beats picking a winner: mislabelled output is the one
-// failure a screenshot tool cannot let through, since nothing downstream can
-// tell the picture from its name.
-export const MANAGED_FLAGS = ["--screen", "--mock"] as const
-
-const assertNoManagedFlags = (args: readonly string[]): void => {
-  const clash = MANAGED_FLAGS.find((flag) => args.includes(flag))
-  if (!clash) return
-  throw new Error(
-    `${clash} is set by cli-shot, so passing it to the driven command leaves two in argv.\n` +
-      (clash === "--screen"
-        ? `  Use cli-shot's --only <screen> instead, before the --.`
-        : `  Mock data is on by default; use cli-shot's --no-mock to turn it off.`),
-  )
+// Everything after `--` is the caller's, and it wins. cli-shot fills in only
+// what is absent — appending a second --screen made the app read the caller's
+// while the filename came from cli-shot's, which wrote a files.png holding the
+// Sync screen with exit 0 and no warning.
+export const drivenScreen = (args: readonly string[]): string | undefined => {
+  const at = args.indexOf("--screen")
+  return at === -1 ? undefined : args[at + 1]
 }
 
 const screenArgs = (
   args: readonly string[],
   screen: string,
   mock: boolean,
-): string[] => [...args, ...(mock ? ["--mock"] : []), "--screen", screen]
+): string[] => [
+  ...args,
+  ...(mock && !args.includes("--mock") ? ["--mock"] : []),
+  ...(drivenScreen(args) === undefined ? ["--screen", screen] : []),
+]
 
 export const shootScreen = async (
   screen: string,
   { command, args = [], out, mock = true, ...rest }: ShootOptions,
 ): Promise<string> => {
-  assertNoManagedFlags(args)
   const ansi = await capture(command, screenArgs(args, screen, mock), rest)
   return toImage(ansi, join(out, `${screen}.png`), rest)
 }
@@ -93,7 +86,11 @@ const pool = async <T, R>(
 // added to the app appears in the next run's output without this package being
 // touched — and one that was quietly never captured stops being invisible.
 export const shootAll = async (options: ShootOptions): Promise<string[]> => {
-  assertNoManagedFlags(options.args ?? [])
+  // A screen named in the driven command is already an answer to "which one",
+  // so there is nothing to enumerate — and the file takes its name.
+  const pinned = drivenScreen(options.args ?? [])
+  if (pinned) return [await shootScreen(pinned, options)]
+
   const screens = listScreens(options.command, options.args ?? [])
   return pool(screens, options.concurrency ?? defaultConcurrency(), (screen) =>
     shootScreen(screen, options),

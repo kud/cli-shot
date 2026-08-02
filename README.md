@@ -42,11 +42,16 @@ cli-shot --out assets/screenshots -- pcloud
 Everything after `--` is the command being driven, so its own flags stay clear
 of cli-shot's.
 
-Two exceptions: cli-shot appends `--mock` and `--screen` to that command itself.
-Passing either one yourself leaves two in argv — the app reads the first while
-the filename comes from the second, which is how you get a `files.png` holding
-the Sync screen. cli-shot refuses rather than guessing, and points you at
-`--only` or `--no-mock`.
+cli-shot adds `--mock` and `--screen` to that command, but only where you
+haven't. Anything you pass wins:
+
+```sh
+cli-shot --out shots -- pcloud --screen sync    # shoots Sync, writes sync.png
+cli-shot --out shots --only sync -- pcloud      # the same thing, said from here
+```
+
+Naming a screen yourself is already an answer to "which one", so cli-shot skips
+the discovery loop and takes the filename from your value.
 
 ```sh
 cli-shot --out shots --only sync -- pcloud        # one screen
