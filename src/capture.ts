@@ -16,12 +16,11 @@ const { Terminal } = headless
 // the raw error points at neither.
 const explainSpawnFailure = (error: unknown, command: string): Error => {
   const message = error instanceof Error ? error.message : String(error)
-  if (!message.includes("posix_spawnp")) {
-    return error instanceof Error ? error : new Error(message)
-  }
-
   const helper = helperPath()
-  const notExecutable = helper !== undefined && !isExecutable(helper)
+  const notExecutable =
+    message.includes("posix_spawnp") &&
+    helper !== undefined &&
+    !isExecutable(helper)
 
   return new Error(
     `Could not open a pty for ${command}: ${message}\n` +
@@ -104,6 +103,7 @@ export const capture = (
       return
     }
 
+    let raw = 0
     let idle: NodeJS.Timeout | undefined
     let sentKeys = false
     let finished = false
@@ -154,13 +154,29 @@ export const capture = (
     const hard = setTimeout(finish, timeout)
 
     pty.onData((data) => {
+      raw += data.length
       term.write(data)
       clearTimeout(idle)
       idle = setTimeout(onSettled, settle)
     })
 
-    pty.onExit(() => {
+    // node-pty does not always throw for a command that cannot be run — it
+    // forks, fails inside the child, and reports it as an exit. Resolving that
+    // as an empty capture would hand freeze nothing and blame the renderer, so
+    // a non-zero exit that drew nothing rejects here where the cause is known.
+    pty.onExit(({ exitCode }) => {
       clearTimeout(idle)
+      if (exitCode !== 0 && raw === 0) {
+        finished = true
+        clearTimeout(hard)
+        reject(
+          explainSpawnFailure(
+            new Error(`exited ${exitCode} without drawing anything`),
+            command,
+          ),
+        )
+        return
+      }
       idle = setTimeout(onSettled, 0)
     })
   })

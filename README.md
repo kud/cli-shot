@@ -1,11 +1,30 @@
-# @kud/cli-shot
+<div align="center">
 
-Automatic screenshots of interactive CLIs — pty capture, terminal emulation,
-PNG out.
+# 📸 cli-shot
+
+<img src="https://img.shields.io/npm/v/@kud/cli-shot?style=flat-square" alt="npm version" />
+<img src="https://img.shields.io/badge/licence-MIT-blue?style=flat-square" alt="MIT licence" />
+<img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen?style=flat-square" alt="Node >=20" />
+
+**Automatic screenshots of interactive CLIs — pty capture, terminal emulation, PNG out.**
+
+[Website](https://kud.io/projects/cli-shot) ·
+[Documentation](https://kud.io/projects/cli-shot/docs) ·
+[npm](https://www.npmjs.com/package/@kud/cli-shot)
+
+</div>
 
 Point it at a CLI. It asks which screens the CLI has, opens each one, and writes
 an image per screen. No per-project script, no keystroke tables, no hand-cropped
 window captures that go stale the next time the UI moves.
+
+## Features
+
+- **Screens discovered, not hardcoded** — asks the CLI via `--screen list`, so a tab you add shows up in the next run without touching this package
+- **Real terminal emulation** — the pty stream is resolved to the grid a user would see, rather than every redraw concatenated
+- **Fixtures by default** — `--mock` is on unless you opt out, because a screenshot outlives the moment it was taken
+- **Deterministic and headless** — fixed size, fixed data, no window manager, runnable in CI
+- **Scriptable last mile** — `--keys` reaches state a screen name can't address
 
 ## Install
 
@@ -90,3 +109,7 @@ position, an open dialog or a filtered view are beyond what a name can carry.
 ## Licence
 
 MIT © Erwann Mest
+
+---
+
+📚 **Full documentation → [cli-shot/docs](https://kud.io/projects/cli-shot/docs)**
