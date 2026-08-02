@@ -113,6 +113,10 @@ export const capture = (
     }
 
     let raw = 0
+    // Kept alongside the terminal because xterm parses asynchronously: at exit
+    // the grid may still be empty while the bytes have plainly arrived, so the
+    // failure has to be looked for on the raw side of that queue.
+    let rawText = ""
     let sentKeys = false
     let finished = false
     let previous = ""
@@ -182,6 +186,7 @@ export const capture = (
 
     pty.onData((data) => {
       raw += data.length
+      if (rawText.length < 2_048) rawText += data
       term.write(data)
     })
 
@@ -196,7 +201,7 @@ export const capture = (
       // having drawn, so a check on emptiness alone let it through and resolved
       // with that message as the screen. Left there, cli-shot would render a
       // PNG of the error rather than reporting one.
-      if (exitCode !== 0 && (raw === 0 || HELPER_FAILURE.test(grid()))) {
+      if (exitCode !== 0 && (raw === 0 || HELPER_FAILURE.test(rawText))) {
         finished = true
         clearInterval(poll)
         clearTimeout(hard)
