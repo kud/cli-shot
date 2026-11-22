@@ -6,7 +6,7 @@
 <img src="https://img.shields.io/badge/licence-MIT-blue?style=flat-square" alt="MIT licence" />
 <img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen?style=flat-square" alt="Node >=20" />
 
-**Automatic screenshots of interactive CLIs — pty capture, terminal emulation, PNG out.**
+**Automatic screenshots and recordings of interactive CLIs — pty capture, terminal emulation, PNG, asciicast or a web player out.**
 
 [Website](https://kud.io/projects/cli-shot) ·
 [Documentation](https://kud.io/projects/cli-shot/docs) ·
@@ -25,6 +25,7 @@ window captures that go stale the next time the UI moves.
 - **Fixtures by default** — `--mock` is on unless you opt out, because a screenshot outlives the moment it was taken
 - **Deterministic and headless** — fixed size, fixed data, no window manager, runnable in CI
 - **Scriptable last mile** — `--keys` reaches state a screen name can't address
+- **Recordings too** — `--format cast` writes asciicast v2, and `--format web` a static replay page ready for Vercel
 
 ## Install
 
@@ -62,7 +63,8 @@ cli-shot --out shots --no-mock -- pcloud          # real data (careful)
 
 | flag                |                                                   |
 | ------------------- | ------------------------------------------------- |
-| `-o, --out <dir>`   | directory to write PNGs into                      |
+| `-o, --out <dir>`   | directory to write into                           |
+| `--format <list>`   | `png`, `cast` and/or `web`, comma-separated       |
 | `--only <screen>`   | shoot one screen instead of every screen          |
 | `--list`            | print the screens the command offers, and stop    |
 | `--cols` / `--rows` | terminal size (default 110×32)                    |
@@ -70,7 +72,68 @@ cli-shot --out shots --no-mock -- pcloud          # real data (careful)
 | `--jobs <n>`        | screens shot at once; defaults to the core count  |
 | `--keys <sequence>` | keystrokes sent once the screen has drawn         |
 | `--font <family>`   | font to render with; defaults to a Nerd Font      |
+| `--title <text>`    | page title for `--format web`                     |
+| `--base <path>`     | `<base href>` for the web page, see below         |
 | `--no-mock`         | drive real data instead of fixtures               |
+
+## Recordings and the web player
+
+The same capture that becomes a PNG can be kept as a recording. The pty
+stream is written as it arrived, timed, up to the moment the screen settled —
+so a cast always ends on the frame its PNG shows.
+
+```sh
+cli-shot --out demo --format cast -- pcloud       # demo/<screen>.cast
+cli-shot --out demo --format png,cast -- pcloud   # both, from one capture
+cli-shot --out demo --format web -- pcloud        # casts + a replay page
+```
+
+`.cast` files are [asciicast v2](https://docs.asciinema.org/manual/asciicast/v2/),
+so `asciinema play demo/sync.cast` and any asciicast player read them.
+
+`--format web` writes the casts plus a static page that replays them, one
+window per screen, into the same folder:
+
+```
+demo/
+├── index.html
+├── vercel.json
+├── <screen>.cast
+└── assets/   player.js · chrome.css · xterm.js · Symbols Nerd Font
+```
+
+The folder deploys as it stands — `vercel deploy demo` — with no build step.
+The page replays through xterm.js, the browser build of the emulator that
+resolved the capture, and bundles the Symbols Nerd Font so icons draw as they
+do in a real terminal. It follows the system's light or dark mode (pin one
+with `?theme=light` or `?theme=dark`), starts each recording when it scrolls
+into view, loops, and shows only the final frame under
+`prefers-reduced-motion`. On a narrow screen the terminal is scaled down
+rather than re-wrapped, so a phone sees the same layout, smaller. Replay only:
+nothing on the page accepts input.
+
+The look lives in one file, `assets/chrome.css` (`player/chrome.css` in this
+repository): page, window frame and the terminal palette, all as CSS custom
+properties that the player reads.
+
+When a site serves the page under another path — a rewrite from
+`kud.io/projects/<name>/demo` to the deployment, say — pass that path so the
+page's relative URLs resolve against it:
+
+```sh
+cli-shot --out demo --format web --base /projects/pcloud/demo/ -- pcloud
+```
+
+To try it locally, from a clone:
+
+```sh
+npm install && npm run build
+npm run example:web                 # drives examples/harbour.mjs, an invented TUI
+npx serve examples/web              # or any static server
+```
+
+`examples/casts/` holds recordings of the same fixture, made with
+`npm run example:casts`.
 
 ## The contract
 
@@ -94,6 +157,7 @@ than they usually intend, and a screenshot outlives the moment it was taken.
 
 ```
 node-pty  →  @xterm/headless  →  serialize  →  freeze  →  png
+    └──────────────  timed stream  ──────────────────→  cast  →  web page
 ```
 
 The middle step is the one that isn't obvious. A pty hands back **every redraw

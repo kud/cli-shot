@@ -1,0 +1,59 @@
+---
+title: 🎞️ Recordings
+description: Writing asciicast v2 recordings with --format cast, and a static replay page with --format web.
+---
+
+## From the same capture
+
+`--format` chooses what each screen becomes. It takes a comma-separated list, and every format comes from one capture of the screen:
+
+| format | writes                                                                                        |
+| ------ | --------------------------------------------------------------------------------------------- |
+| `png`  | `<screen>.png`, rendered through freeze (the default)                                         |
+| `cast` | `<screen>.cast`, an [asciicast v2](https://docs.asciinema.org/manual/asciicast/v2/) recording |
+| `web`  | the casts, plus `index.html`, `assets/` and `vercel.json` to replay them                      |
+
+```sh
+cli-shot --out demo --format png,cast -- pcloud
+```
+
+A recording is the raw pty stream, timed from the moment the command was spawned, up to the moment the screen settled. Nothing after that point is kept, so the last frame of the cast is the frame the PNG shows. `--keys` works as it does for screenshots: the keystrokes are not recorded, but what the command drew in answer to them is.
+
+## The web player
+
+```sh
+cli-shot --out demo --format web --title pcloud -- pcloud
+vercel deploy demo
+```
+
+The page shows one window per screen and replays each recording into [xterm.js](https://xtermjs.org/) — the browser build of the emulator that resolved the capture. It is replay only: the terminal accepts no input and nothing runs.
+
+- **Fonts** — the Symbols Nerd Font ships in `assets/fonts/`, limited by `unicode-range` to the icon code points, so TUI icons render while letters keep the system monospace.
+- **Themes** — light by default, dark under `prefers-color-scheme: dark`; `?theme=light` or `?theme=dark` pins one.
+- **Narrow screens** — the terminal is scaled down to fit, never re-wrapped, because a recording made at 110 columns re-flowed to 40 would show a screen that never existed.
+- **Motion** — a recording starts when it scrolls into view, loops after a short hold, and under `prefers-reduced-motion` shows only its final frame.
+
+### Theming
+
+Everything visual is in `assets/chrome.css`: the page, the window frame, and the terminal palette as `--term-*` custom properties that `player.js` reads at start-up. A new look is a change to that one file.
+
+### Serving under another path
+
+The page uses relative URLs only. When a site rewrites a path of its own to the deployment — `kud.io/projects/<name>/demo`, for instance — pass that path with `--base` so the page's assets resolve against it:
+
+```sh
+cli-shot --out demo --format web --base /projects/pcloud/demo/ -- pcloud
+```
+
+## From the library
+
+```ts
+import { shootAll, buildPlayer, toCast, parseCast } from "@kud/cli-shot";
+
+await shootAll({ command: "pcloud", out: "demo", formats: ["web"] });
+
+// Or build the page around casts made elsewhere:
+buildPlayer({ out: "demo", screens: ["files", "sync"], title: "pcloud" });
+```
+
+`toCast(header, events)` writes asciicast v2 text from `[seconds, "o", data]` events, and `parseCast(text)` reads it back.
