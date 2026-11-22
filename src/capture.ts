@@ -1,11 +1,19 @@
-import { accessSync, constants, existsSync } from "node:fs";
-import { createRequire } from "node:module";
 import { spawn } from "node-pty";
 // @xterm/headless is CommonJS and exposes Terminal only through the default
 // export, so a named import type-checks against its .d.ts and then fails at
 // runtime with "does not provide an export named 'Terminal'".
 import headless from "@xterm/headless";
 import { SerializeAddon } from "@xterm/addon-serialize";
+import {
+  HelperError,
+  currentContext,
+  helperPath,
+  isExecutable,
+  isHelperFailure,
+  spawnWithRepair,
+  type HelperContext,
+  type Repair,
+} from "./spawn-helper.js";
 
 const { Terminal } = headless;
 
@@ -18,48 +26,46 @@ const TICK_MS = 60;
 // never ran.
 const HELPER_FAILURE = /execvp\(\d\) failed|posix_spawnp failed/;
 
-// node-pty spawns a small helper binary, and "posix_spawnp failed" is all it
-// says when that helper is not executable. Its prebuilds ship without the mode
-// bit and the postinstall that sets it is the first thing an npm allow-scripts
-// policy blocks — so the common cause is a permission, not a bad command, and
-// the raw error points at neither.
-const explainSpawnFailure = (error: unknown, command: string): Error => {
+// The raw error from node-pty names neither the command nor the helper it
+// could not start, so it is rewritten into one that says which file to fix and
+// how, including after a repair attempt that did not take.
+export const explainSpawnFailure = (
+  error: unknown,
+  command: string,
+  repair: Repair = { kind: "not-applicable" },
+  context: HelperContext = currentContext(),
+): Error => {
   const message = error instanceof Error ? error.message : String(error);
-  const helper = helperPath();
-  const notExecutable =
-    message.includes("posix_spawnp") &&
-    helper !== undefined &&
-    !isExecutable(helper);
+  const fix = (helper: string) => `    chmod +x ${helper}\n`;
 
-  return new Error(
-    `Could not open a pty for ${command}: ${message}\n` +
-      (notExecutable
+  let advice: string;
+  if (repair.kind === "unfixable") {
+    advice =
+      `  node-pty's helper is not executable and could not be fixed (${repair.reason}):\n` +
+      `    ${repair.helper}\n` +
+      `  Fix with:\n` +
+      fix(repair.helper);
+  } else if (repair.kind === "repaired") {
+    advice =
+      `  node-pty's helper was made executable but the spawn still failed:\n` +
+      `    ${repair.helper}\n` +
+      `  If it lost the bit again, fix with:\n` +
+      fix(repair.helper);
+  } else {
+    const helper = helperPath(context);
+    advice =
+      isHelperFailure(message) && helper !== undefined && !isExecutable(helper)
         ? `  node-pty's helper is not executable. Fix with:\n` +
-          `    chmod +x ${helper}\n` +
+          fix(helper) +
           `  It ships without the mode bit when install scripts are blocked;\n` +
           `  npm approve-scripts node-pty makes it survive a reinstall.`
-        : `  Check that the command exists and is executable.`),
+        : `  Check that the command exists and is executable.`;
+  }
+
+  return new Error(
+    `Could not open a pty for ${command}: ${message}\n${advice.trimEnd()}`,
     { cause: error },
   );
-};
-
-const helperPath = (): string | undefined => {
-  const candidate = createRequire(import.meta.url)
-    .resolve("node-pty")
-    .replace(
-      /node-pty\/.*$/,
-      `node-pty/prebuilds/${process.platform}-${process.arch}/spawn-helper`,
-    );
-  return existsSync(candidate) ? candidate : undefined;
-};
-
-const isExecutable = (path: string): boolean => {
-  try {
-    accessSync(path, constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
 };
 
 // Shared with anything that describes the capture afterwards, such as a cast
@@ -132,14 +138,20 @@ export const capture = (
 
     let pty: ReturnType<typeof spawn>;
     try {
-      pty = spawn(command, [...args], {
-        name: "xterm-256color",
-        cols,
-        rows,
-        env: childEnv(process.env, env),
-      });
+      pty = spawnWithRepair(() =>
+        spawn(command, [...args], {
+          name: "xterm-256color",
+          cols,
+          rows,
+          env: childEnv(process.env, env),
+        }),
+      );
     } catch (error) {
-      reject(explainSpawnFailure(error, command));
+      reject(
+        error instanceof HelperError
+          ? explainSpawnFailure(error.original, command, error.repair)
+          : explainSpawnFailure(error, command),
+      );
       return;
     }
 
