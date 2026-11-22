@@ -4,11 +4,11 @@ All notable changes to this project are documented here.
 
 ---
 
-## Unreleased
+## 0.3.2 — 2026-11-22
 
 ### Fixes
 
-- On macOS, a capture that fails with `posix_spawnp failed` because node-pty's `spawn-helper` lost its executable bit now sets the bit and retries once; if that cannot be done, the error names the file and the exact `chmod +x` to run. ([#3](https://github.com/kud/cli-shot/issues/3))
+- On macOS, captures no longer fail with `posix_spawnp failed` when npm leaves node-pty's `spawn-helper` without its exec bit: cli-shot repairs it and retries once, or names the `chmod +x` to run. ([e784cf7](https://github.com/kud/cli-shot/commit/e784cf7edfba83d1cf26ae8c845b9c3c59595e2b))
 
 ---
 
