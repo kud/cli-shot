@@ -45,6 +45,18 @@ test("one window per cast, in name order by default, each pointing at its file",
   expect(html).not.toMatch(/\{\{\w+\}\}/)
 })
 
+test("each window has a macOS title bar and labelled playback controls", () => {
+  buildPlayer({ out, title: "harbour" })
+  const html = readFileSync(join(out, "index.html"), "utf8")
+
+  expect(html).toContain('<div class="window-bar" aria-hidden="true">')
+  expect(html).toContain('<span class="window-title">harbour log — zsh</span>')
+  for (const label of ["Play", "Restart", "Playback speed 1×, switch to 2×"]) {
+    expect(html).toContain(`aria-label="${label}"`)
+  }
+  expect(html.match(/<button type="button"/g)).toHaveLength(6)
+})
+
 test("screens can be chosen and ordered", () => {
   buildPlayer({ out, screens: ["queue"] })
   const html = readFileSync(join(out, "index.html"), "utf8")

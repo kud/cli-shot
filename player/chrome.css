@@ -3,8 +3,10 @@
  * palette. player.js reads the --term-* tokens to theme xterm.js, so a new
  * palette is a change to this file and nothing else.
  *
- * Light is the default; dark follows the system, and ?theme=light|dark on the
- * page URL pins either one (it sets data-theme on <html>).
+ * The window is a dark macOS terminal in both page themes: only the page
+ * around it follows light or dark. Light is the default; dark follows the
+ * system, and ?theme=light|dark on the page URL pins either one (it sets
+ * data-theme on <html>).
  */
 
 @font-face {
@@ -17,23 +19,31 @@
     U+23FB-23FE, U+2665, U+26A1, U+2B58, U+E000-F8FF, U+F0000-FFFFD;
 }
 
+/* The window and its terminal: dark whatever the page does. */
 :root {
   color-scheme: light;
 
   --page-bg: #f4f4f2;
   --page-fg: #2b2b2b;
 
-  --frame-bg: #e9e9e6;
-  --frame-border: rgb(0 0 0 / 0.1);
+  --frame-bg: #1c1c1e;
+  --frame-border: rgb(255 255 255 / 0.08);
   --frame-radius: 10px;
-  --frame-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 12px 32px rgb(0 0 0 / 0.1);
+  --frame-shadow: 0 10px 30px rgb(0 0 0 / 0.25);
   --frame-pad: 14px;
   --frame-gap: 32px;
-  --bar-height: 34px;
-  --bar-fg: #6b6b6b;
+  --bar-bg: #2a2a2c;
+  --bar-height: 32px;
+  --bar-fg: #9a9a9e;
+  --bar-fg-hover: #e4e4e4;
+  --bar-font: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas,
+    "DejaVu Sans Mono", monospace;
+  --dot-size: 11px;
+  --dot-gap: 7px;
   --dot-close: #ff5f57;
   --dot-min: #febc2e;
   --dot-max: #28c840;
+  --focus-ring: #6aa0ff;
 
   --term-font:
     "Symbols Nerd Font Mono", ui-monospace, "SF Mono", "JetBrains Mono",
@@ -41,74 +51,11 @@
   --term-font-size: 14;
   --term-line-height: 1.15;
 
-  --term-bg: #fbfbfa;
-  --term-fg: #2b2b2b;
-  --term-cursor: #2b2b2b;
-  --term-selection: rgb(0 0 0 / 0.15);
-  --term-ansi-0: #2b2b2b;
-  --term-ansi-1: #c4342d;
-  --term-ansi-2: #2f8a3b;
-  --term-ansi-3: #a86f00;
-  --term-ansi-4: #2b5fb8;
-  --term-ansi-5: #9b3fb0;
-  --term-ansi-6: #1f8a8a;
-  --term-ansi-7: #d9d9d6;
-  --term-ansi-8: #7a7a7a;
-  --term-ansi-9: #e0453d;
-  --term-ansi-10: #3aa04a;
-  --term-ansi-11: #c48600;
-  --term-ansi-12: #3b74d6;
-  --term-ansi-13: #b34fc9;
-  --term-ansi-14: #27a3a3;
-  --term-ansi-15: #ffffff;
-}
-
-/* Dark, twice: once for the system preference, once for ?theme=dark. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --page-bg: #151515;
-    --page-fg: #e4e4e4;
-    --frame-bg: #262626;
-    --frame-border: rgb(255 255 255 / 0.08);
-    --frame-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.45);
-    --bar-fg: #9a9a9a;
-    --term-bg: #1c1c1c;
-    --term-fg: #e4e4e4;
-    --term-cursor: #e4e4e4;
-    --term-selection: rgb(255 255 255 / 0.2);
-    --term-ansi-0: #1c1c1c;
-    --term-ansi-1: #ff6b63;
-    --term-ansi-2: #5fd06e;
-    --term-ansi-3: #f2c14e;
-    --term-ansi-4: #6aa0ff;
-    --term-ansi-5: #d68cf0;
-    --term-ansi-6: #4fd1d1;
-    --term-ansi-7: #d0d0d0;
-    --term-ansi-8: #6e6e6e;
-    --term-ansi-9: #ff8a84;
-    --term-ansi-10: #7fe08c;
-    --term-ansi-11: #ffd479;
-    --term-ansi-12: #8cb6ff;
-    --term-ansi-13: #e4a8f7;
-    --term-ansi-14: #74e3e3;
-    --term-ansi-15: #ffffff;
-  }
-}
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --page-bg: #151515;
-  --page-fg: #e4e4e4;
-  --frame-bg: #262626;
-  --frame-border: rgb(255 255 255 / 0.08);
-  --frame-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.45);
-  --bar-fg: #9a9a9a;
-  --term-bg: #1c1c1c;
+  --term-bg: #1c1c1e;
   --term-fg: #e4e4e4;
   --term-cursor: #e4e4e4;
   --term-selection: rgb(255 255 255 / 0.2);
-  --term-ansi-0: #1c1c1c;
+  --term-ansi-0: #1c1c1e;
   --term-ansi-1: #ff6b63;
   --term-ansi-2: #5fd06e;
   --term-ansi-3: #f2c14e;
@@ -124,6 +71,24 @@
   --term-ansi-13: #e4a8f7;
   --term-ansi-14: #74e3e3;
   --term-ansi-15: #ffffff;
+}
+
+/* Dark, twice: once for the system preference, once for ?theme=dark. Only the
+   page changes; the window is already dark. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page-bg: #151515;
+    --page-fg: #e4e4e4;
+    --frame-shadow: 0 10px 30px rgb(0 0 0 / 0.5);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page-bg: #151515;
+  --page-fg: #e4e4e4;
+  --frame-shadow: 0 10px 30px rgb(0 0 0 / 0.5);
 }
 
 *,
@@ -176,21 +141,22 @@ body {
   justify-content: center;
   height: var(--bar-height);
   padding: 0 72px;
+  background: var(--bar-bg);
   color: var(--bar-fg);
-  font-size: 13px;
+  font: 12px/1 var(--bar-font);
   user-select: none;
 }
 
 .window-dots {
   position: absolute;
-  left: 14px;
+  left: 12px;
   display: flex;
-  gap: 8px;
+  gap: var(--dot-gap);
 }
 
 .window-dots i {
-  width: 12px;
-  height: 12px;
+  width: var(--dot-size);
+  height: var(--dot-size);
   border-radius: 50%;
   background: var(--dot-close);
 }
@@ -211,7 +177,6 @@ body {
 
 .window-screen {
   padding: var(--frame-pad);
-  padding-top: 4px;
   background: var(--term-bg);
   overflow: hidden;
 }
@@ -234,19 +199,69 @@ body {
   overflow: hidden !important;
 }
 
+/* A slim footer under the screen, in the bar's colour. */
+.window-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--bar-height);
+  padding: 0 8px;
+  background: var(--bar-bg);
+}
+
+.control {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--bar-fg);
+  font: 12px/1 var(--bar-font);
+  cursor: pointer;
+}
+
+.control:hover {
+  color: var(--bar-fg-hover);
+  background: rgb(255 255 255 / 0.06);
+}
+
+.control:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.control svg {
+  grid-area: 1 / 1;
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+
+.control-speed {
+  margin-left: auto;
+}
+
+/* The toggle shows what pressing it does: play while paused, pause while
+   playing. */
+.window .icon-pause,
+.window[data-state="playing"] .icon-play {
+  visibility: hidden;
+}
+
+.window[data-state="playing"] .icon-pause {
+  visibility: visible;
+}
+
 @media (max-width: 520px) {
   :root {
     --frame-pad: 8px;
-    --frame-radius: 8px;
     --bar-height: 28px;
   }
 
   .demo {
     padding: 16px;
-  }
-
-  .window-dots i {
-    width: 10px;
-    height: 10px;
   }
 }

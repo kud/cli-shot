@@ -4,7 +4,7 @@
 // terminal, and nothing is ever executed.
 import { Terminal } from "./xterm.mjs"
 
-const HOLD_MS = 2500
+const SPEEDS = [1, 2]
 const ANSI = [
   "black",
   "red",
@@ -102,11 +102,20 @@ const mount = async (figure) => {
   fit()
   new ResizeObserver(fit).observe(figure.parentElement)
 
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-    term.options.theme = theme()
-  })
-
+  // Playback runs on the recording's own clock, so pausing and changing speed
+  // carry on from the same moment rather than restarting it.
+  const controls = {
+    toggle: figure.querySelector('[data-action="toggle"]'),
+    restart: figure.querySelector('[data-action="restart"]'),
+    speed: figure.querySelector('[data-action="speed"]'),
+  }
   let timer
+  let next = 0
+  let position = 0
+  let speed = SPEEDS[0]
+  let playing = false
+  let ticked = 0
+
   const apply = ([, code, data]) => {
     if (code === "o") term.write(data)
     else {
@@ -115,37 +124,103 @@ const mount = async (figure) => {
     }
   }
 
-  const stop = () => clearTimeout(timer)
+  const setPlaying = (value) => {
+    playing = value
+    figure.dataset.state = value ? "playing" : "paused"
+    controls.toggle?.setAttribute("aria-label", value ? "Pause" : "Play")
+  }
 
-  const play = () => {
-    stop()
+  const rewind = () => {
     term.reset()
     term.resize(header.width, header.height)
+    next = 0
+    position = 0
+  }
 
-    if (reducedMotion.matches) {
-      events.forEach(apply)
-      return
-    }
+  const advance = () => {
+    const now = performance.now()
+    position += ((now - ticked) / 1000) * speed
+    ticked = now
+  }
 
-    const started = performance.now()
-    let next = 0
-    const step = () => {
-      const now = (performance.now() - started) / 1000
-      while (next < events.length && events[next][0] <= now) apply(events[next++])
-      timer =
-        next < events.length
-          ? setTimeout(step, (events[next][0] - now) * 1000)
-          : setTimeout(play, HOLD_MS)
+  const step = () => {
+    advance()
+    while (next < events.length && events[next][0] <= position) apply(events[next++])
+    if (next < events.length) {
+      timer = setTimeout(step, ((events[next][0] - position) / speed) * 1000)
+    } else {
+      setPlaying(false)
     }
+  }
+
+  const play = () => {
+    clearTimeout(timer)
+    if (next >= events.length) rewind()
+    setPlaying(true)
+    ticked = performance.now()
     step()
   }
 
-  // Start when scrolled into view, and stop when out of it, so a page of
-  // several screens is not animating what nobody is looking at.
-  new IntersectionObserver(([entry]) => {
-    if (entry.isIntersecting) play()
-    else stop()
-  }).observe(figure)
+  const pause = () => {
+    if (!playing) return
+    clearTimeout(timer)
+    advance()
+    setPlaying(false)
+  }
+
+  // Before anything plays, the window holds the last frame: the screen the
+  // PNG shows, never an empty terminal.
+  const showLast = () => {
+    rewind()
+    events.forEach(apply)
+    next = events.length
+    setPlaying(false)
+  }
+
+  controls.toggle?.addEventListener("click", () => (playing ? pause() : play()))
+  controls.restart?.addEventListener("click", () => {
+    rewind()
+    play()
+  })
+  controls.speed?.addEventListener("click", () => {
+    if (playing) advance()
+    speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]
+    const other = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]
+    controls.speed.textContent = `${speed}×`
+    controls.speed.setAttribute(
+      "aria-label",
+      `Playback speed ${speed}×, switch to ${other}×`,
+    )
+    if (playing) {
+      clearTimeout(timer)
+      step()
+    }
+  })
+
+  showLast()
+
+  // Plays once, the first time it scrolls into view, and never on its own
+  // under reduced motion. Leaving view mid-play pauses it; coming back resumes.
+  let autoplayed = false
+  let pausedByScroll = false
+  new IntersectionObserver(
+    ([entry]) => {
+      if (entry.isIntersecting) {
+        if (!autoplayed && !reducedMotion.matches) {
+          autoplayed = true
+          rewind()
+          play()
+        } else if (pausedByScroll) {
+          pausedByScroll = false
+          play()
+        }
+      } else if (playing) {
+        pausedByScroll = true
+        pause()
+      }
+    },
+    { threshold: 0.5 },
+  ).observe(figure)
 }
 
 const start = async () => {

@@ -43,16 +43,32 @@ const escapeHtml = (text: string): string =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
 
-const screenMarkup = (screen: string): string => {
+// Inline so the controls draw before any stylesheet or font has arrived.
+const ICONS = {
+  play: '<svg class="icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.8v10.4L13 8z"/></svg>',
+  pause:
+    '<svg class="icon-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/></svg>',
+  restart:
+    '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7l1.4.5A4 4 0 1 0 8 4v2L4.8 3.2 8 .5z"/></svg>',
+}
+
+// The bar reads as the shell's own title: the command, then the shell.
+const screenMarkup = (command: string, screen: string): string => {
   const name = escapeHtml(screen)
+  const label = escapeHtml(`${command} ${screen}`)
   const cast = escapeHtml(encodeURIComponent(`${screen}.cast`))
   return [
-    `      <figure class="window" data-cast="${cast}" aria-label="Terminal recording: ${name}">`,
+    `      <figure class="window" data-cast="${cast}" aria-label="Terminal recording: ${label}">`,
     `        <div class="window-bar" aria-hidden="true">`,
     `          <span class="window-dots"><i></i><i></i><i></i></span>`,
-    `          <span class="window-title">${name}</span>`,
+    `          <span class="window-title">${label} — zsh</span>`,
     `        </div>`,
     `        <div class="window-screen"><div class="window-term"></div></div>`,
+    `        <div class="window-controls" role="group" aria-label="Playback: ${name}">`,
+    `          <button type="button" class="control" data-action="toggle" aria-label="Play">${ICONS.play}${ICONS.pause}</button>`,
+    `          <button type="button" class="control" data-action="restart" aria-label="Restart">${ICONS.restart}</button>`,
+    `          <button type="button" class="control control-speed" data-action="speed" aria-label="Playback speed 1×, switch to 2×">1×</button>`,
+    `        </div>`,
     `      </figure>`,
   ].join("\n")
 }
@@ -130,7 +146,7 @@ export const buildPlayer = ({
   const html = fill(readFileSync(join(PLAYER, "index.html"), "utf8"), {
     title: escapeHtml(title),
     base: base ? `<base href="${escapeHtml(base)}" />` : "",
-    screens: screens.map(screenMarkup).join("\n"),
+    screens: screens.map((screen) => screenMarkup(title, screen)).join("\n"),
   })
   const index = join(out, "index.html")
   writeFileSync(index, html)

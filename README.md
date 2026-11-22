@@ -105,10 +105,11 @@ demo/
 The folder deploys as it stands — `vercel deploy demo` — with no build step.
 The page replays through xterm.js, the browser build of the emulator that
 resolved the capture, and bundles the Symbols Nerd Font so icons draw as they
-do in a real terminal. It follows the system's light or dark mode (pin one
-with `?theme=light` or `?theme=dark`), starts each recording when it scrolls
-into view, loops, and shows only the final frame under
-`prefers-reduced-motion`. On a narrow screen the terminal is scaled down
+do in a real terminal. Each recording sits in a dark macOS-style window,
+whatever the page's light or dark mode (pin one with `?theme=light` or
+`?theme=dark`). A window shows its final frame first, plays once when it
+scrolls into view (never on its own under `prefers-reduced-motion`), and has
+play/pause, restart and 1×/2× speed controls. On a narrow screen the terminal is scaled down
 rather than re-wrapped, so a phone sees the same layout, smaller. Replay only:
 nothing on the page accepts input.
 

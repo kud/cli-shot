@@ -31,11 +31,12 @@ The page shows one window per screen and replays each recording into [xterm.js](
 - **Fonts** — the Symbols Nerd Font ships in `assets/fonts/`, limited by `unicode-range` to the icon code points, so TUI icons render while letters keep the system monospace.
 - **Themes** — light by default, dark under `prefers-color-scheme: dark`; `?theme=light` or `?theme=dark` pins one.
 - **Narrow screens** — the terminal is scaled down to fit, never re-wrapped, because a recording made at 110 columns re-flowed to 40 would show a screen that never existed.
-- **Motion** — a recording starts when it scrolls into view, loops after a short hold, and under `prefers-reduced-motion` shows only its final frame.
+- **Motion** — each window first shows its final frame, then plays once when it scrolls into view; under `prefers-reduced-motion` it never starts on its own.
+- **Controls** — play/pause, restart and 1×/2× speed sit in a footer under the screen, as keyboard-reachable buttons.
 
 ### Theming
 
-Everything visual is in `assets/chrome.css`: the page, the window frame, and the terminal palette as `--term-*` custom properties that `player.js` reads at start-up. A new look is a change to that one file.
+Everything visual is in `assets/chrome.css`: the page, the macOS-style window (dark in both page themes), and the terminal palette as `--term-*` custom properties that `player.js` reads at start-up. A new look is a change to that one file.
 
 ### Serving under another path
 
