@@ -4,6 +4,30 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.3.0 — 2026-11-22
+
+### Breaking Changes
+
+- `--screen` is now `--only` on cli-shot itself, and a driven command carrying `--screen` or `--mock` was refused with a message naming the replacement. Rename the flag in your scripts. First shipped in 0.2.0; 0.2.1 relaxed the refusal (see below). ([50537d5](https://github.com/kud/cli-shot/commit/50537d5f654f264520615e892908f3788f890ff7))
+
+### Highlights
+
+- Record a screen instead of just photographing it: `--format cast`, `web`, `gif` and `mp4` all come from one capture, including an asciicast file and a static xterm.js replay page you can deploy to Vercel. An invented example TUI is included to try it on. ([eaa40d7](https://github.com/kud/cli-shot/commit/eaa40d7c9857b48da0d30e58dd17bcac2aced1b6))
+- The command after `--` is now yours to write exactly as you would type it: cli-shot only fills in `--mock` and `--screen` when they are absent, so `-- pcloud --screen sync` and `--only sync -- pcloud` give the same `sync.png`. Shipped in 0.2.1. ([1af648a](https://github.com/kud/cli-shot/commit/1af648a0362aa92d6951f58ba5efec060efa49f0))
+
+### Fixes
+
+- Misused flags now print a plain error message rather than a Node stack trace, so the line saying what went wrong is no longer buried. Shipped in 0.2.0. ([50537d5](https://github.com/kud/cli-shot/commit/50537d5f654f264520615e892908f3788f890ff7))
+
+<details>
+<summary>Internal (4 commits)</summary>
+
+- Changelog and project icon added, changelog links tidied, and the 0.2.0 and 0.2.1 version bumps.
+
+</details>
+
+---
+
 ## 0.1.2 — 2026-08-02
 
 ### Fixes
