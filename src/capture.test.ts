@@ -1,14 +1,14 @@
-import { test, expect } from "vitest"
-import { capture } from "./capture.js"
+import { describe, it, test, expect } from "vitest";
+import { capture, childEnv } from "./capture.js";
 
-const node = process.execPath
-const sh = "/bin/sh"
+const node = process.execPath;
+const sh = "/bin/sh";
 
 test("returns what the command drew", async () => {
-  const ansi = await capture(node, ["-e", "process.stdout.write('hello pty')"])
+  const ansi = await capture(node, ["-e", "process.stdout.write('hello pty')"]);
 
-  expect(ansi).toContain("hello pty")
-})
+  expect(ansi).toContain("hello pty");
+});
 
 // The emulator exists to collapse redraws. A command that overwrites its own
 // line must serialise as the final state, not as both states concatenated —
@@ -17,42 +17,42 @@ test("a redrawn line serialises once, at its final value", async () => {
   const ansi = await capture(node, [
     "-e",
     "process.stdout.write('loading\\rdone   ')",
-  ])
+  ]);
 
-  expect(ansi).toContain("done")
-  expect(ansi).not.toContain("loading")
-})
+  expect(ansi).toContain("done");
+  expect(ansi).not.toContain("loading");
+});
 
 test("keeps colour", async () => {
   const ansi = await capture(node, [
     "-e",
     "process.stdout.write('\\u001b[32mgreen\\u001b[0m')",
-  ])
+  ]);
 
-  expect(ansi).toContain("green")
-  expect(ansi).toMatch(/\[/)
-})
+  expect(ansi).toContain("green");
+  expect(ansi).toMatch(/\[/);
+});
 
 test("keys are delivered once the screen has drawn", async () => {
   const ansi = await capture(
     sh,
     ["-c", 'printf ready; read line; printf " got:%s" "$line"'],
     { keys: "x\r", settle: 600, timeout: 10_000 },
-  )
+  );
 
-  expect(ansi).toContain("got:x")
-})
+  expect(ansi).toContain("got:x");
+});
 
 test("gives up at the timeout rather than hanging on a command that never exits", async () => {
-  const started = Date.now()
+  const started = Date.now();
   await capture(
     node,
     ["-e", "process.stdout.write('up');setInterval(()=>{},1000)"],
     { settle: 200, timeout: 3_000 },
-  )
+  );
 
-  expect(Date.now() - started).toBeLessThan(6_000)
-})
+  expect(Date.now() - started).toBeLessThan(6_000);
+});
 
 // node-pty forks first and fails inside the child, so this arrives as an exit
 // rather than a throw. Resolved as an empty capture it would surface much later
@@ -60,9 +60,31 @@ test("gives up at the timeout rather than hanging on a command that never exits"
 test("a command that does not exist explains itself", async () => {
   await expect(capture("/nonexistent/command/xyz")).rejects.toThrow(
     /Could not open a pty/,
-  )
-})
+  );
+});
 
 test("a command that fails without drawing rejects rather than returning blank", async () => {
-  await expect(capture(sh, ["-c", "exit 3"])).rejects.toThrow(/exited 3/)
-})
+  await expect(capture(sh, ["-c", "exit 3"])).rejects.toThrow(/exited 3/);
+});
+
+describe("childEnv", () => {
+  it("drops CI markers so an Ink app stays interactive in a pty", () => {
+    const env = childEnv({
+      CI: "1",
+      CONTINUOUS_INTEGRATION: "true",
+      HOME: "/h",
+    });
+    expect(env).toEqual({ HOME: "/h" });
+  });
+
+  it("lets the caller's own env set them back", () => {
+    expect(childEnv({ CI: "1" }, { CI: "1" })).toEqual({ CI: "1" });
+  });
+
+  it("leaves other variables, including CI_ prefixed ones, alone", () => {
+    expect(childEnv({ CI_JOB: "7", TERM: "x" })).toEqual({
+      CI_JOB: "7",
+      TERM: "x",
+    });
+  });
+});
