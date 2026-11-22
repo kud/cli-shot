@@ -29,13 +29,13 @@ const at_ = (row, col) => esc(`${row};${col}H`)
 
 // Nerd Font private-use glyphs, the reason the player bundles a symbols font.
 const ICON = {
-  ship: "",
-  branch: "",
-  check: "",
-  clock: "",
-  node: "",
-  box: "",
-  warn: "",
+  ship: "\uf21a",
+  branch: "\ue0a0",
+  check: "\uf00c",
+  clock: "\uf017",
+  node: "\ue718",
+  box: "\uf487",
+  warn: "\uf071",
 }
 
 const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]

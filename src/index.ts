@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs"
 import { cpus } from "node:os"
-import { join } from "node:path"
+import { basename, join } from "node:path"
 import {
   capture,
   DEFAULT_COLS,
@@ -10,6 +10,7 @@ import {
 import { toCast, type CastEvent } from "./cast.js"
 import { listScreens } from "./screens.js"
 import { toImage, type RenderOptions } from "./render.js"
+import { buildPlayer } from "./web.js"
 
 export { capture, type CaptureOptions } from "./capture.js"
 export {
@@ -23,6 +24,7 @@ export {
   type ParsedCast,
 } from "./cast.js"
 export { listScreens } from "./screens.js"
+export { buildPlayer, VERCEL_CONFIG, type PlayerOptions } from "./web.js"
 export { toImage, DEFAULT_FONT, type RenderOptions } from "./render.js"
 
 export type ShootOptions = CaptureOptions &
@@ -42,13 +44,18 @@ export type ShootOptions = CaptureOptions &
     /** How many screens to shoot at once. Defaults to the core count. */
     concurrency?: number
     /**
-     * What to write per screen: `png` (rendered through freeze) and/or `cast`
-     * (an asciicast v2 recording of the same capture). Defaults to `["png"]`.
+     * What to write: `png` (rendered through freeze), `cast` (an asciicast v2
+     * recording of the same capture), and/or `web` (the casts plus a static
+     * replay page, deployable as is). Defaults to `["png"]`.
      */
     formats?: readonly Format[]
+    /** Title of the `web` page. Defaults to the command's name. */
+    title?: string
+    /** `<base href>` for the `web` page, when served under another path. */
+    base?: string
   }
 
-export const FORMATS = ["png", "cast"] as const
+export const FORMATS = ["png", "cast", "web"] as const
 export type Format = (typeof FORMATS)[number]
 
 // Everything after `--` is the caller's, and it wins. cli-shot fills in only
@@ -86,7 +93,8 @@ export const shootFormats = async (
   }: ShootOptions,
 ): Promise<string[]> => {
   const events: CastEvent[] = []
-  const recording = formats.includes("cast")
+  // The page replays casts, so asking for it is asking for them too.
+  const recording = formats.includes("cast") || formats.includes("web")
   const startedAt = Date.now() / 1000
 
   const ansi = await capture(command, screenArgs(args, screen, mock), {
@@ -170,11 +178,29 @@ export const shootAll = async (options: ShootOptions): Promise<string[]> => {
   const screens = pinned
     ? [pinned]
     : listScreens(options.command, options.args ?? [])
+  return shootScreens(screens, options)
+}
 
-  const written = await pool(
-    screens,
-    options.concurrency ?? defaultConcurrency(),
-    (screen) => shootFormats(screen, options),
-  )
-  return written.flat()
+/** Shoot the named screens in every requested format, and build the page if asked. */
+export const shootScreens = async (
+  screens: readonly string[],
+  options: ShootOptions,
+): Promise<string[]> => {
+  const written = (
+    await pool(screens, options.concurrency ?? defaultConcurrency(), (screen) =>
+      shootFormats(screen, options),
+    )
+  ).flat()
+
+  if (options.formats?.includes("web")) {
+    written.push(
+      ...buildPlayer({
+        out: options.out,
+        screens,
+        title: options.title ?? basename(options.command),
+        base: options.base,
+      }),
+    )
+  }
+  return written
 }

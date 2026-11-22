@@ -3,7 +3,7 @@ import { Command } from "commander"
 import { listScreens } from "./screens.js"
 import {
   shootAll,
-  shootFormats,
+  shootScreens,
   DEFAULT_FONT,
   FORMATS,
   type Format,
@@ -41,6 +41,11 @@ program
     "--font <family>",
     "font to render with; needs Nerd Font coverage for TUI icons",
     DEFAULT_FONT,
+  )
+  .option("--title <text>", "page title for --format web")
+  .option(
+    "--base <path>",
+    "path the web page is served under, when a site rewrites to it",
   )
   .option("--jobs <n>", "screens to shoot at once; defaults to core count")
   .option("--no-mock", "drive real data instead of fixtures")
@@ -84,6 +89,8 @@ const shoot = {
   font: options.font,
   concurrency: options.jobs ? Number(options.jobs) : undefined,
   formats: formats as Format[],
+  title: options.title,
+  base: options.base,
 }
 
 if (options.list) {
@@ -96,7 +103,7 @@ if (options.list) {
 // written to be read, so print them and nothing else.
 try {
   const written = options.only
-    ? await shootFormats(options.only, shoot)
+    ? await shootScreens([options.only], shoot)
     : await shootAll(shoot)
 
   for (const path of written) console.log(path)
