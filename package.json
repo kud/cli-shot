@@ -1,6 +1,6 @@
 {
   "name": "@kud/cli-shot",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "description": "Automatic screenshots and recordings of interactive CLIs — pty capture, terminal emulation, PNG, asciicast, a web player, GIF or MP4 out",
   "license": "MIT",
