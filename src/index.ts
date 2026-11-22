@@ -1,10 +1,27 @@
+import { mkdirSync, writeFileSync } from "node:fs"
 import { cpus } from "node:os"
 import { join } from "node:path"
-import { capture, type CaptureOptions } from "./capture.js"
+import {
+  capture,
+  DEFAULT_COLS,
+  DEFAULT_ROWS,
+  type CaptureOptions,
+} from "./capture.js"
+import { toCast, type CastEvent } from "./cast.js"
 import { listScreens } from "./screens.js"
 import { toImage, type RenderOptions } from "./render.js"
 
 export { capture, type CaptureOptions } from "./capture.js"
+export {
+  toCast,
+  parseCast,
+  castHeader,
+  castEvent,
+  type CastHeader,
+  type CastEvent,
+  type CastEventCode,
+  type ParsedCast,
+} from "./cast.js"
 export { listScreens } from "./screens.js"
 export { toImage, DEFAULT_FONT, type RenderOptions } from "./render.js"
 
@@ -24,7 +41,15 @@ export type ShootOptions = CaptureOptions &
     mock?: boolean
     /** How many screens to shoot at once. Defaults to the core count. */
     concurrency?: number
+    /**
+     * What to write per screen: `png` (rendered through freeze) and/or `cast`
+     * (an asciicast v2 recording of the same capture). Defaults to `["png"]`.
+     */
+    formats?: readonly Format[]
   }
+
+export const FORMATS = ["png", "cast"] as const
+export type Format = (typeof FORMATS)[number]
 
 // Everything after `--` is the caller's, and it wins. cli-shot fills in only
 // what is absent — appending a second --screen made the app read the caller's
@@ -45,13 +70,66 @@ const screenArgs = (
   ...(drivenScreen(args) === undefined ? ["--screen", screen] : []),
 ]
 
+// One capture feeds every format. The recording is the raw stream up to the
+// moment the screen settled, and the PNG is the grid at that same moment — so
+// a cast always ends on the frame its PNG shows, which two separate runs of a
+// live CLI could not promise.
+export const shootFormats = async (
+  screen: string,
+  {
+    command,
+    args = [],
+    out,
+    mock = true,
+    formats = ["png"],
+    ...rest
+  }: ShootOptions,
+): Promise<string[]> => {
+  const events: CastEvent[] = []
+  const recording = formats.includes("cast")
+  const startedAt = Date.now() / 1000
+
+  const ansi = await capture(command, screenArgs(args, screen, mock), {
+    ...rest,
+    onOutput: recording
+      ? (data, elapsed) => {
+          events.push([elapsed / 1000, "o", data])
+          rest.onOutput?.(data, elapsed)
+        }
+      : rest.onOutput,
+  })
+
+  const written: string[] = []
+  if (formats.includes("png")) {
+    written.push(toImage(ansi, join(out, `${screen}.png`), rest))
+  }
+  if (recording) {
+    const path = join(out, `${screen}.cast`)
+    mkdirSync(out, { recursive: true })
+    writeFileSync(
+      path,
+      toCast(
+        {
+          width: rest.cols ?? DEFAULT_COLS,
+          height: rest.rows ?? DEFAULT_ROWS,
+          timestamp: startedAt,
+          title: screen,
+          env: { TERM: "xterm-256color" },
+        },
+        events,
+      ),
+    )
+    written.push(path)
+  }
+  return written
+}
+
+/** Shoot one screen to a PNG. See {@link shootFormats} for other formats. */
 export const shootScreen = async (
   screen: string,
-  { command, args = [], out, mock = true, ...rest }: ShootOptions,
-): Promise<string> => {
-  const ansi = await capture(command, screenArgs(args, screen, mock), rest)
-  return toImage(ansi, join(out, `${screen}.png`), rest)
-}
+  options: ShootOptions,
+): Promise<string> =>
+  (await shootFormats(screen, { ...options, formats: ["png"] }))[0]!
 
 // Each screen costs a pty and then a freeze render, both mostly CPU — so the
 // core count is the useful ceiling. Measured on six pcloud screens: four jobs
@@ -89,10 +167,14 @@ export const shootAll = async (options: ShootOptions): Promise<string[]> => {
   // A screen named in the driven command is already an answer to "which one",
   // so there is nothing to enumerate — and the file takes its name.
   const pinned = drivenScreen(options.args ?? [])
-  if (pinned) return [await shootScreen(pinned, options)]
+  const screens = pinned
+    ? [pinned]
+    : listScreens(options.command, options.args ?? [])
 
-  const screens = listScreens(options.command, options.args ?? [])
-  return pool(screens, options.concurrency ?? defaultConcurrency(), (screen) =>
-    shootScreen(screen, options),
+  const written = await pool(
+    screens,
+    options.concurrency ?? defaultConcurrency(),
+    (screen) => shootFormats(screen, options),
   )
+  return written.flat()
 }
