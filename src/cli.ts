@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander"
 import { listScreens } from "./screens.js"
+import { movieFlags } from "./flags.js"
 import {
   shootAll,
   shootScreens,
@@ -42,11 +43,25 @@ program
     "font to render with; needs Nerd Font coverage for TUI icons",
     DEFAULT_FONT,
   )
-  .option("--title <text>", "page title for --format web")
+  .option(
+    "--title <text>",
+    "page title for --format web, window title for gif/mp4",
+  )
   .option(
     "--base <path>",
     "path the web page is served under, when a site rewrites to it",
   )
+  .option("--fps <n>", "gif/mp4: frames per second (default 15)")
+  .option(
+    "--speed <n>",
+    "gif/mp4: playback speed, 2 is twice as fast (default 1)",
+  )
+  .option(
+    "--max-duration <s>",
+    "gif/mp4: longest replay in seconds; longer ones are sped up to fit",
+  )
+  .option("--loop <n>", "gif: times to play, 0 for forever (default 0)")
+  .option("--scale <n>", "gif/mp4: pixel density, 2 for retina (default 1)")
   .option("--jobs <n>", "screens to shoot at once; defaults to core count")
   .option("--no-mock", "drive real data instead of fixtures")
   .parse(own)
@@ -77,7 +92,16 @@ if (unknown.length > 0 || formats.length === 0) {
   process.exit(1)
 }
 
+let movie
+try {
+  movie = movieFlags(options)
+} catch (error) {
+  console.error((error as Error).message)
+  process.exit(1)
+}
+
 const shoot = {
+  ...movie,
   command,
   args,
   out: options.out,

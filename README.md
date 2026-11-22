@@ -6,7 +6,7 @@
 <img src="https://img.shields.io/badge/licence-MIT-blue?style=flat-square" alt="MIT licence" />
 <img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen?style=flat-square" alt="Node >=20" />
 
-**Automatic screenshots and recordings of interactive CLIs — pty capture, terminal emulation, PNG, asciicast or a web player out.**
+**Automatic screenshots and recordings of interactive CLIs — pty capture, terminal emulation, PNG, asciicast, a web player, GIF or MP4 out.**
 
 [Website](https://kud.io/projects/cli-shot) ·
 [Documentation](https://kud.io/projects/cli-shot/docs) ·
@@ -25,7 +25,7 @@ window captures that go stale the next time the UI moves.
 - **Fixtures by default** — `--mock` is on unless you opt out, because a screenshot outlives the moment it was taken
 - **Deterministic and headless** — fixed size, fixed data, no window manager, runnable in CI
 - **Scriptable last mile** — `--keys` reaches state a screen name can't address
-- **Recordings too** — `--format cast` writes asciicast v2, and `--format web` a static replay page ready for Vercel
+- **Recordings too** — `--format cast` writes asciicast v2, `--format web` a static replay page ready for Vercel, and `--format gif` / `mp4` that page's window as a moving image
 
 ## Install
 
@@ -61,20 +61,25 @@ cli-shot --out shots --keys $'jjj\r' -- pcloud    # drive deeper first
 cli-shot --out shots --no-mock -- pcloud          # real data (careful)
 ```
 
-| flag                |                                                   |
-| ------------------- | ------------------------------------------------- |
-| `-o, --out <dir>`   | directory to write into                           |
-| `--format <list>`   | `png`, `cast` and/or `web`, comma-separated       |
-| `--only <screen>`   | shoot one screen instead of every screen          |
-| `--list`            | print the screens the command offers, and stop    |
-| `--cols` / `--rows` | terminal size (default 110×32)                    |
-| `--settle <ms>`     | how long the screen must hold still (default 350) |
-| `--jobs <n>`        | screens shot at once; defaults to the core count  |
-| `--keys <sequence>` | keystrokes sent once the screen has drawn         |
-| `--font <family>`   | font to render with; defaults to a Nerd Font      |
-| `--title <text>`    | page title for `--format web`                     |
-| `--base <path>`     | `<base href>` for the web page, see below         |
-| `--no-mock`         | drive real data instead of fixtures               |
+| flag                 |                                                     |
+| -------------------- | --------------------------------------------------- |
+| `-o, --out <dir>`    | directory to write into                             |
+| `--format <list>`    | `png`, `cast`, `web`, `gif`, `mp4`, comma-separated |
+| `--only <screen>`    | shoot one screen instead of every screen            |
+| `--list`             | print the screens the command offers, and stop      |
+| `--cols` / `--rows`  | terminal size (default 110×32)                      |
+| `--settle <ms>`      | how long the screen must hold still (default 350)   |
+| `--jobs <n>`         | screens shot at once; defaults to the core count    |
+| `--keys <sequence>`  | keystrokes sent once the screen has drawn           |
+| `--font <family>`    | font to render with; defaults to a Nerd Font        |
+| `--title <text>`     | page title for `web`, window title for `gif`/`mp4`  |
+| `--base <path>`      | `<base href>` for the web page, see below           |
+| `--fps <n>`          | `gif`/`mp4` frames per second (default 15)          |
+| `--speed <n>`        | `gif`/`mp4` playback speed (default 1)              |
+| `--max-duration <s>` | `gif`/`mp4` longest replay; sped up to fit          |
+| `--loop <n>`         | `gif` plays, 0 for forever (default 0)              |
+| `--scale <n>`        | `gif`/`mp4` pixel density, 2 for retina (default 1) |
+| `--no-mock`          | drive real data instead of fixtures                 |
 
 ## Recordings and the web player
 
@@ -135,6 +140,34 @@ npx serve examples/web              # or any static server
 
 `examples/casts/` holds recordings of the same fixture, made with
 `npm run example:casts`.
+
+## GIF and MP4
+
+Where a moving image has to travel on its own — a social post, a slide, a
+README — the same capture can be filmed as a GIF or an MP4:
+
+```sh
+cli-shot --out demo --format gif -- pcloud                      # demo/<screen>.gif
+cli-shot --out demo --format png,web,gif,mp4 -- pcloud          # all from one capture
+cli-shot --out demo --format gif --speed 2 --max-duration 6 -- pcloud
+```
+
+The frames are the web player's own window — the macOS chrome from
+`chrome.css`, the bundled Symbols Nerd Font, xterm.js — rendered in headless
+Chromium and encoded with ffmpeg, so a GIF looks like the web demo it sits
+beside. The recording is stepped on its own clock rather than played in real
+time, and only frames where something changed are kept, so the output is
+identical on a slow machine and a fast one, and small: a single palette, no
+dithering, only the changed rectangle stored per frame. The last frame, the
+one the PNG shows, holds for two seconds before the loop.
+
+`--max-duration` speeds a long recording up to fit rather than cutting it,
+so a GIF still ends on the settled screen. `--loop` counts plays, `0` meaning
+forever; an MP4 ignores it.
+
+Filming needs two things the PNG path does not: `ffmpeg` on `PATH`, and
+Playwright with its Chromium (`npm install playwright && npx playwright install chromium`).
+Both are only looked for when `gif` or `mp4` is asked for.
 
 ## The contract
 

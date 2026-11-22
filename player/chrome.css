@@ -255,6 +255,12 @@ body {
   visibility: visible;
 }
 
+/* Filmed for --format gif or mp4: the controls would be a picture of buttons
+   nobody can press. */
+:root[data-capture] .window-controls {
+  display: none;
+}
+
 @media (max-width: 520px) {
   :root {
     --frame-pad: 8px;

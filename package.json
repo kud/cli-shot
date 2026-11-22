@@ -2,7 +2,7 @@
   "name": "@kud/cli-shot",
   "version": "0.2.1",
   "type": "module",
-  "description": "Automatic screenshots and recordings of interactive CLIs — pty capture, terminal emulation, PNG, asciicast or a web player out",
+  "description": "Automatic screenshots and recordings of interactive CLIs — pty capture, terminal emulation, PNG, asciicast, a web player, GIF or MP4 out",
   "license": "MIT",
   "homepage": "https://kud.io/projects/cli-shot",
   "repository": {
@@ -31,7 +31,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "example:casts": "node dist/cli.js --out examples/casts --format cast -- node examples/harbour.mjs",
-    "example:web": "node dist/cli.js --out examples/web --format web --title harbour -- node examples/harbour.mjs"
+    "example:web": "node dist/cli.js --out examples/web --format web --title harbour -- node examples/harbour.mjs",
+    "example:gif": "node dist/cli.js --out examples/gif --format gif --title harbour -- node examples/harbour.mjs"
   },
   "dependencies": {
     "@xterm/addon-serialize": "0.14.0",
@@ -39,6 +40,14 @@
     "@xterm/xterm": "6.0.0",
     "commander": "15.0.0",
     "node-pty": "1.1.0"
+  },
+  "peerDependencies": {
+    "playwright": ">=1.40"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "22.20.1",

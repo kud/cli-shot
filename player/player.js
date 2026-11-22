@@ -65,6 +65,11 @@ export const parseCast = (text) => {
 
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)")
 
+// ?capture is how --format gif and mp4 film the page: nothing plays on its
+// own, and the recording is stepped from outside, one frame at a time, so the
+// result depends on the recording's clock rather than the browser's.
+const capturing = new URLSearchParams(location.search).has("capture")
+
 const mount = async (figure) => {
   const host = figure.querySelector(".window-term")
   const response = await fetch(figure.dataset.cast)
@@ -196,6 +201,24 @@ const mount = async (figure) => {
       step()
     }
   })
+
+  if (capturing) {
+    rewind()
+    window.cliShotCapture = {
+      times: events.map(([time]) => time),
+      // Applies events up to `count`, then waits for xterm to parse them and
+      // for two frames to paint, so a screenshot taken next shows them.
+      until: (count) =>
+        new Promise((resolve) => {
+          while (next < count) apply(events[next++])
+          term.write("", () =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve)),
+          )
+        }),
+    }
+    figure.dataset.capture = "ready"
+    return
+  }
 
   showLast()
 

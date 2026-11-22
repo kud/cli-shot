@@ -11,6 +11,13 @@ import { toCast, type CastEvent } from "./cast.js"
 import { listScreens } from "./screens.js"
 import { toImage, type RenderOptions } from "./render.js"
 import { buildPlayer } from "./web.js"
+import {
+  launchBrowser,
+  toMovie,
+  MOVIE_FORMATS,
+  type MovieBrowser,
+  type MovieOptions,
+} from "./movie.js"
 
 export { capture, type CaptureOptions } from "./capture.js"
 export {
@@ -26,9 +33,24 @@ export {
 export { listScreens } from "./screens.js"
 export { buildPlayer, VERCEL_CONFIG, type PlayerOptions } from "./web.js"
 export { toImage, DEFAULT_FONT, type RenderOptions } from "./render.js"
+export {
+  toMovie,
+  movieFrames,
+  launchBrowser,
+  hasFfmpeg,
+  MOVIE_FORMATS,
+  DEFAULT_FPS,
+  DEFAULT_HOLD,
+  type MovieFormat,
+  type MovieFrame,
+  type MovieInput,
+  type MovieOptions,
+  type MovieBrowser,
+} from "./movie.js"
 
 export type ShootOptions = CaptureOptions &
-  RenderOptions & {
+  RenderOptions &
+  MovieOptions & {
     /** The CLI to drive. */
     command: string
     /** Arguments before the ones this adds. */
@@ -45,17 +67,20 @@ export type ShootOptions = CaptureOptions &
     concurrency?: number
     /**
      * What to write: `png` (rendered through freeze), `cast` (an asciicast v2
-     * recording of the same capture), and/or `web` (the casts plus a static
-     * replay page, deployable as is). Defaults to `["png"]`.
+     * recording of the same capture), `web` (the casts plus a static replay
+     * page, deployable as is), and/or `gif` / `mp4` (that page's window,
+     * filmed). Defaults to `["png"]`.
      */
     formats?: readonly Format[]
-    /** Title of the `web` page. Defaults to the command's name. */
+    /** Title of the `web` page, and of the gif/mp4 window. Defaults to the command's name. */
     title?: string
+    /** Browser to film gif/mp4 in, shared across screens; launched per screen otherwise. */
+    browser?: MovieBrowser
     /** `<base href>` for the `web` page, when served under another path. */
     base?: string
   }
 
-export const FORMATS = ["png", "cast", "web"] as const
+export const FORMATS = ["png", "cast", "web", ...MOVIE_FORMATS] as const
 export type Format = (typeof FORMATS)[number]
 
 // Everything after `--` is the caller's, and it wins. cli-shot fills in only
@@ -89,12 +114,17 @@ export const shootFormats = async (
     out,
     mock = true,
     formats = ["png"],
+    title = basename(command),
+    browser,
     ...rest
   }: ShootOptions,
 ): Promise<string[]> => {
   const events: CastEvent[] = []
-  // The page replays casts, so asking for it is asking for them too.
-  const recording = formats.includes("cast") || formats.includes("web")
+  // The page replays casts, so asking for it is asking for them too. A movie
+  // is filmed from a cast as well, but keeps it only if it was asked for.
+  const movies = MOVIE_FORMATS.filter((format) => formats.includes(format))
+  const keepCast = formats.includes("cast") || formats.includes("web")
+  const recording = keepCast || movies.length > 0
   const startedAt = Date.now() / 1000
 
   const ansi = await capture(command, screenArgs(args, screen, mock), {
@@ -111,23 +141,36 @@ export const shootFormats = async (
   if (formats.includes("png")) {
     written.push(toImage(ansi, join(out, `${screen}.png`), rest))
   }
-  if (recording) {
+  if (!recording) return written
+
+  const cast = toCast(
+    {
+      width: rest.cols ?? DEFAULT_COLS,
+      height: rest.rows ?? DEFAULT_ROWS,
+      timestamp: startedAt,
+      title: screen,
+      env: { TERM: "xterm-256color" },
+    },
+    events,
+  )
+  if (keepCast) {
     const path = join(out, `${screen}.cast`)
     mkdirSync(out, { recursive: true })
-    writeFileSync(
-      path,
-      toCast(
-        {
-          width: rest.cols ?? DEFAULT_COLS,
-          height: rest.rows ?? DEFAULT_ROWS,
-          timestamp: startedAt,
-          title: screen,
-          env: { TERM: "xterm-256color" },
-        },
-        events,
-      ),
-    )
+    writeFileSync(path, cast)
     written.push(path)
+  }
+  for (const format of movies) {
+    written.push(
+      await toMovie({
+        ...rest,
+        cast,
+        screen,
+        title,
+        format,
+        browser,
+        output: join(out, `${screen}.${format}`),
+      }),
+    )
   }
   return written
 }
@@ -186,11 +229,26 @@ export const shootScreens = async (
   screens: readonly string[],
   options: ShootOptions,
 ): Promise<string[]> => {
-  const written = (
-    await pool(screens, options.concurrency ?? defaultConcurrency(), (screen) =>
-      shootFormats(screen, options),
-    )
-  ).flat()
+  // One browser films every screen: launching Chromium costs more than
+  // filming a short screen in it.
+  const filming = options.formats?.some((format) =>
+    (MOVIE_FORMATS as readonly string[]).includes(format),
+  )
+  const browser =
+    options.browser ?? (filming ? await launchBrowser() : undefined)
+
+  let written: string[]
+  try {
+    written = (
+      await pool(
+        screens,
+        options.concurrency ?? defaultConcurrency(),
+        (screen) => shootFormats(screen, { ...options, browser }),
+      )
+    ).flat()
+  } finally {
+    if (browser !== options.browser) await browser?.close()
+  }
 
   if (options.formats?.includes("web")) {
     written.push(
