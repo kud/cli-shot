@@ -12,6 +12,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 0.3.1 — 2026-11-22
+
+### Fixes
+
+- Recordings are no longer empty on build hosts such as Vercel or GitHub Actions: the captured command now stays interactive even when `CI` is set, and your own `env` still wins. ([eca3119](https://github.com/kud/cli-shot/commit/eca31194f5de00f489954d4ea234876027cb0821))
+
+---
+
 ## 0.3.0 — 2026-11-22
 
 ### Breaking Changes
