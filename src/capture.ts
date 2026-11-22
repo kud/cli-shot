@@ -62,6 +62,11 @@ const isExecutable = (path: string): boolean => {
   }
 }
 
+// Shared with anything that describes the capture afterwards, such as a cast
+// header, so the size written down is the size the pty was opened at.
+export const DEFAULT_COLS = 110
+export const DEFAULT_ROWS = 32
+
 export type CaptureOptions = {
   cols?: number
   rows?: number
@@ -72,6 +77,12 @@ export type CaptureOptions = {
   env?: NodeJS.ProcessEnv
   /** Keystrokes sent once the first draw has settled, for state a flag cannot name. */
   keys?: string
+  /**
+   * Every chunk the pty produced, in order, with milliseconds since spawn —
+   * the raw stream before the emulator resolves it, which is what a recording
+   * replays. Stops at the moment the capture does.
+   */
+  onOutput?: (data: string, elapsed: number) => void
 }
 
 // A pty hands back every redraw in order, not a picture of the screen. Written
@@ -86,12 +97,13 @@ export const capture = (
   command: string,
   args: readonly string[] = [],
   {
-    cols = 110,
-    rows = 32,
+    cols = DEFAULT_COLS,
+    rows = DEFAULT_ROWS,
     settle = 350,
     timeout = 15_000,
     env,
     keys,
+    onOutput,
   }: CaptureOptions = {},
 ): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -120,6 +132,7 @@ export const capture = (
     let sentKeys = false
     let finished = false
     let previous = ""
+    const started = performance.now()
 
     const finish = () => {
       if (finished) return
@@ -185,6 +198,10 @@ export const capture = (
     const hard = setTimeout(finish, timeout)
 
     pty.onData((data) => {
+      // Bytes that arrive after the screen settled are not part of what was
+      // captured; a recording that kept them would end on a different frame
+      // from the PNG of the same screen.
+      if (!finished) onOutput?.(data, performance.now() - started)
       raw += data.length
       if (rawText.length < 2_048) rawText += data
       term.write(data)

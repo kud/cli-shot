@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 import { Command } from "commander"
 import { listScreens } from "./screens.js"
-import { shootAll, shootScreen, DEFAULT_FONT } from "./index.js"
+import { movieFlags } from "./flags.js"
+import {
+  shootAll,
+  shootScreens,
+  DEFAULT_FONT,
+  FORMATS,
+  type Format,
+} from "./index.js"
 
 // Everything after `--` is the CLI being driven, split off before commander
 // sees it. Without that split a driven flag like --mock is claimed by cli-shot,
@@ -19,7 +26,12 @@ program
       "The command to drive follows `--`:\n" +
       "  cli-shot --out assets/screenshots -- pcloud",
   )
-  .requiredOption("-o, --out <dir>", "directory to write PNGs into")
+  .requiredOption("-o, --out <dir>", "directory to write into")
+  .option(
+    "--format <list>",
+    `what to write per screen, comma-separated: ${FORMATS.join(", ")}`,
+    "png",
+  )
   .option("--only <screen>", "shoot one screen instead of every screen")
   .option("--list", "print the screens the command offers, and stop")
   .option("--cols <n>", "terminal columns", "110")
@@ -31,6 +43,25 @@ program
     "font to render with; needs Nerd Font coverage for TUI icons",
     DEFAULT_FONT,
   )
+  .option(
+    "--title <text>",
+    "page title for --format web, window title for gif/mp4",
+  )
+  .option(
+    "--base <path>",
+    "path the web page is served under, when a site rewrites to it",
+  )
+  .option("--fps <n>", "gif/mp4: frames per second (default 15)")
+  .option(
+    "--speed <n>",
+    "gif/mp4: playback speed, 2 is twice as fast (default 1)",
+  )
+  .option(
+    "--max-duration <s>",
+    "gif/mp4: longest replay in seconds; longer ones are sped up to fit",
+  )
+  .option("--loop <n>", "gif: times to play, 0 for forever (default 0)")
+  .option("--scale <n>", "gif/mp4: pixel density, 2 for retina (default 1)")
   .option("--jobs <n>", "screens to shoot at once; defaults to core count")
   .option("--no-mock", "drive real data instead of fixtures")
   .parse(own)
@@ -46,7 +77,31 @@ if (driven.length === 0) {
 
 const [command, ...args] = driven
 
+const formats = String(options.format)
+  .split(",")
+  .map((format) => format.trim())
+  .filter(Boolean)
+const unknown = formats.filter(
+  (format) => !(FORMATS as readonly string[]).includes(format),
+)
+if (unknown.length > 0 || formats.length === 0) {
+  console.error(
+    `Unknown format ${unknown.join(", ") || "(none)"}. ` +
+      `Choose from: ${FORMATS.join(", ")}.`,
+  )
+  process.exit(1)
+}
+
+let movie
+try {
+  movie = movieFlags(options)
+} catch (error) {
+  console.error((error as Error).message)
+  process.exit(1)
+}
+
 const shoot = {
+  ...movie,
   command,
   args,
   out: options.out,
@@ -57,6 +112,9 @@ const shoot = {
   keys: options.keys,
   font: options.font,
   concurrency: options.jobs ? Number(options.jobs) : undefined,
+  formats: formats as Format[],
+  title: options.title,
+  base: options.base,
 }
 
 if (options.list) {
@@ -69,7 +127,7 @@ if (options.list) {
 // written to be read, so print them and nothing else.
 try {
   const written = options.only
-    ? [await shootScreen(options.only, shoot)]
+    ? await shootScreens([options.only], shoot)
     : await shootAll(shoot)
 
   for (const path of written) console.log(path)

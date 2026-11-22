@@ -5,3 +5,5 @@ scratch-*
 .env*
 .mcp.json
 .claude/
+examples/web
+examples/gif

@@ -6,7 +6,7 @@
 <img src="https://img.shields.io/badge/licence-MIT-blue?style=flat-square" alt="MIT licence" />
 <img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen?style=flat-square" alt="Node >=20" />
 
-**Automatic screenshots of interactive CLIs — pty capture, terminal emulation, PNG out.**
+**Automatic screenshots and recordings of interactive CLIs — pty capture, terminal emulation, PNG, asciicast, a web player, GIF or MP4 out.**
 
 [Website](https://kud.io/projects/cli-shot) ·
 [Documentation](https://kud.io/projects/cli-shot/docs) ·
@@ -25,6 +25,7 @@ window captures that go stale the next time the UI moves.
 - **Fixtures by default** — `--mock` is on unless you opt out, because a screenshot outlives the moment it was taken
 - **Deterministic and headless** — fixed size, fixed data, no window manager, runnable in CI
 - **Scriptable last mile** — `--keys` reaches state a screen name can't address
+- **Recordings too** — `--format cast` writes asciicast v2, `--format web` a static replay page ready for Vercel, and `--format gif` / `mp4` that page's window as a moving image
 
 ## Install
 
@@ -60,17 +61,113 @@ cli-shot --out shots --keys $'jjj\r' -- pcloud    # drive deeper first
 cli-shot --out shots --no-mock -- pcloud          # real data (careful)
 ```
 
-| flag                |                                                   |
-| ------------------- | ------------------------------------------------- |
-| `-o, --out <dir>`   | directory to write PNGs into                      |
-| `--only <screen>`   | shoot one screen instead of every screen          |
-| `--list`            | print the screens the command offers, and stop    |
-| `--cols` / `--rows` | terminal size (default 110×32)                    |
-| `--settle <ms>`     | how long the screen must hold still (default 350) |
-| `--jobs <n>`        | screens shot at once; defaults to the core count  |
-| `--keys <sequence>` | keystrokes sent once the screen has drawn         |
-| `--font <family>`   | font to render with; defaults to a Nerd Font      |
-| `--no-mock`         | drive real data instead of fixtures               |
+| flag                 |                                                     |
+| -------------------- | --------------------------------------------------- |
+| `-o, --out <dir>`    | directory to write into                             |
+| `--format <list>`    | `png`, `cast`, `web`, `gif`, `mp4`, comma-separated |
+| `--only <screen>`    | shoot one screen instead of every screen            |
+| `--list`             | print the screens the command offers, and stop      |
+| `--cols` / `--rows`  | terminal size (default 110×32)                      |
+| `--settle <ms>`      | how long the screen must hold still (default 350)   |
+| `--jobs <n>`         | screens shot at once; defaults to the core count    |
+| `--keys <sequence>`  | keystrokes sent once the screen has drawn           |
+| `--font <family>`    | font to render with; defaults to a Nerd Font        |
+| `--title <text>`     | page title for `web`, window title for `gif`/`mp4`  |
+| `--base <path>`      | `<base href>` for the web page, see below           |
+| `--fps <n>`          | `gif`/`mp4` frames per second (default 15)          |
+| `--speed <n>`        | `gif`/`mp4` playback speed (default 1)              |
+| `--max-duration <s>` | `gif`/`mp4` longest replay; sped up to fit          |
+| `--loop <n>`         | `gif` plays, 0 for forever (default 0)              |
+| `--scale <n>`        | `gif`/`mp4` pixel density, 2 for retina (default 1) |
+| `--no-mock`          | drive real data instead of fixtures                 |
+
+## Recordings and the web player
+
+The same capture that becomes a PNG can be kept as a recording. The pty
+stream is written as it arrived, timed, up to the moment the screen settled —
+so a cast always ends on the frame its PNG shows.
+
+```sh
+cli-shot --out demo --format cast -- pcloud       # demo/<screen>.cast
+cli-shot --out demo --format png,cast -- pcloud   # both, from one capture
+cli-shot --out demo --format web -- pcloud        # casts + a replay page
+```
+
+`.cast` files are [asciicast v2](https://docs.asciinema.org/manual/asciicast/v2/),
+so `asciinema play demo/sync.cast` and any asciicast player read them.
+
+`--format web` writes the casts plus a static page that replays them, one
+window per screen, into the same folder:
+
+```
+demo/
+├── index.html
+├── vercel.json
+├── <screen>.cast
+└── assets/   player.js · chrome.css · xterm.js · Symbols Nerd Font
+```
+
+The folder deploys as it stands — `vercel deploy demo` — with no build step.
+The page replays through xterm.js, the browser build of the emulator that
+resolved the capture, and bundles the Symbols Nerd Font so icons draw as they
+do in a real terminal. Each recording sits in a dark macOS-style window,
+whatever the page's light or dark mode (pin one with `?theme=light` or
+`?theme=dark`). A window shows its final frame first, plays once when it
+scrolls into view (never on its own under `prefers-reduced-motion`), and has
+play/pause, restart and 1×/2× speed controls. On a narrow screen the terminal is scaled down
+rather than re-wrapped, so a phone sees the same layout, smaller. Replay only:
+nothing on the page accepts input.
+
+The look lives in one file, `assets/chrome.css` (`player/chrome.css` in this
+repository): page, window frame and the terminal palette, all as CSS custom
+properties that the player reads.
+
+When a site serves the page under another path — a rewrite from
+`kud.io/projects/<name>/demo` to the deployment, say — pass that path so the
+page's relative URLs resolve against it:
+
+```sh
+cli-shot --out demo --format web --base /projects/pcloud/demo/ -- pcloud
+```
+
+To try it locally, from a clone:
+
+```sh
+npm install && npm run build
+npm run example:web                 # drives examples/harbour.mjs, an invented TUI
+npx serve examples/web              # or any static server
+```
+
+`examples/casts/` holds recordings of the same fixture, made with
+`npm run example:casts`.
+
+## GIF and MP4
+
+Where a moving image has to travel on its own — a social post, a slide, a
+README — the same capture can be filmed as a GIF or an MP4:
+
+```sh
+cli-shot --out demo --format gif -- pcloud                      # demo/<screen>.gif
+cli-shot --out demo --format png,web,gif,mp4 -- pcloud          # all from one capture
+cli-shot --out demo --format gif --speed 2 --max-duration 6 -- pcloud
+```
+
+The frames are the web player's own window — the macOS chrome from
+`chrome.css`, the bundled Symbols Nerd Font, xterm.js — rendered in headless
+Chromium and encoded with ffmpeg, so a GIF looks like the web demo it sits
+beside. The recording is stepped on its own clock rather than played in real
+time, and only frames where something changed are kept, so the output is
+identical on a slow machine and a fast one, and small: a single palette, no
+dithering, only the changed rectangle stored per frame. The last frame, the
+one the PNG shows, holds for two seconds before the loop.
+
+`--max-duration` speeds a long recording up to fit rather than cutting it,
+so a GIF still ends on the settled screen. `--loop` counts plays, `0` meaning
+forever; an MP4 ignores it.
+
+Filming needs two things the PNG path does not: `ffmpeg` on `PATH`, and
+Playwright with its Chromium (`npm install playwright && npx playwright install chromium`).
+Both are only looked for when `gif` or `mp4` is asked for.
 
 ## The contract
 
@@ -94,6 +191,7 @@ than they usually intend, and a screenshot outlives the moment it was taken.
 
 ```
 node-pty  →  @xterm/headless  →  serialize  →  freeze  →  png
+    └──────────────  timed stream  ──────────────────→  cast  →  web page
 ```
 
 The middle step is the one that isn't obvious. A pty hands back **every redraw
